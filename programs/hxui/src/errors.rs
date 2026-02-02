@@ -12,5 +12,11 @@ pub enum CustomError {
     WinnerNotDrawn,
 
     #[msg("Only one token can be minted per 12 hours.")]
-    RateLimitExceeded
+    RateLimitExceeded,
+
+    #[msg("Name must not be greater than 32 characters")]
+    NameTooLong,
+
+    #[msg("Description must not be greater than 280 characters")]
+    DescriptionTooLong,
 }

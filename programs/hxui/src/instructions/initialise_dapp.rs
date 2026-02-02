@@ -17,7 +17,7 @@ pub struct InitialiseDapp<'info>{
         seeds = [b"hxui_vault"],
         bump
     )]
-    pub sol_vault:SystemAccount<'info>,
+    pub hxui_vault:SystemAccount<'info>,
 
     #[account(
         init,
@@ -25,7 +25,7 @@ pub struct InitialiseDapp<'info>{
         seeds = [b"hxui_mint"],
         bump,
         mint::decimals = 0,
-        mint::authority = sol_vault,
+        mint::authority = hxui_vault,
         mint::token_program = token_program
     )]
     pub hxui_mint:InterfaceAccount<'info,Mint>,

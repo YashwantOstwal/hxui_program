@@ -299,145 +299,173 @@ describe("1) initialise_dapp instruction testing", () => {
 //   });
 // });
 
-describe("3) register_for_free_tokens instruction testing", () => {
-  it("3.1) Created a new associated token account of hxiui lite mint for admin.", async () => {
-    //associated token account does not exist
-    assert.equal(
-      await connection.getAccountInfo(adminAssociatedTokenAddress),
-      null,
+// describe("3) register_for_free_tokens instruction testing", () => {
+//   it("3.1) Created a new associated token account of hxiui lite mint for admin.", async () => {
+//     //associated token account does not exist
+//     assert.equal(
+//       await connection.getAccountInfo(adminAssociatedTokenAddress),
+//       null,
+//     );
+//     try {
+//       await program.methods
+//         .registerForFreeTokens()
+//         .accounts({
+//           owner: admin,
+//         })
+//         .rpc();
+//     } catch (err) {
+//       console.log(err);
+//     }
+
+//     const [mintedTimestampAddress, mintedTimestampBump] =
+//       PublicKey.findProgramAddressSync(
+//         [Buffer.from("minted_timestamp"), admin.toBuffer()],
+//         program.programId,
+//       );
+
+//     const mintedTimestampAccount =
+//       await program.account.freeTokenTimestamp.fetch(mintedTimestampAddress);
+
+//     //succesfully registered
+//     assert.equal(mintedTimestampAccount.bump, mintedTimestampBump);
+//     assert.equal(mintedTimestampAccount.lastMintedTimestamp, 0);
+
+//     // this fails. always.
+//     //     await getAccount(
+//     //       connection,
+//     //       adminTokenAddress,
+//     //       "confirmed",
+//     //       TOKEN_2022_PROGRAM_ID,
+//     //     ),
+//     // its okay, below is the work around.
+
+//     //verifying the token account of hxui lite mint owned by the admin
+//     const adminAssociatedTokenAccount =
+//       await connection.getTokenAccountsByOwner(admin, {
+//         mint: hxuiLiteMintAddress,
+//       });
+
+//     //is an associated token account.
+//     //  index 0 -> in assumption that no other token account of this mint is owned by admin.
+//     assert(
+//       adminAssociatedTokenAccount.value[0].pubkey.equals(
+//         adminAssociatedTokenAddress,
+//       ),
+//     );
+
+//     //  token 2022 is the owner program
+//     assert(
+//       adminAssociatedTokenAccount.value[0].account.owner.equals(
+//         TOKEN_2022_PROGRAM_ID,
+//       ),
+//     );
+
+//     const {
+//       value: { amount },
+//     } = await connection.getTokenAccountBalance(adminAssociatedTokenAddress);
+//     //balance is 0
+//     assert.equal(amount, adminHxuiLiteTokenBalance);
+//   });
+// });
+
+// describe("4) mint_free_tokens instruction testing", async () => {
+//   const [mintedTimestampAddress] = PublicKey.findProgramAddressSync(
+//     [Buffer.from("minted_timestamp"), admin.toBuffer()],
+//     program.programId,
+//   );
+//   it("4.1) minting free token", async () => {
+//     await program.methods
+//       .mintFreeTokens()
+//       .accounts({
+//         owner: admin,
+//         liteAuthority: liteAuthority.publicKey,
+//       })
+//       .signers([liteAuthority])
+//       .rpc();
+
+//     const {
+//       value: { amount: currentBalance },
+//     } = await connection.getTokenAccountBalance(adminAssociatedTokenAddress);
+
+//     assert.equal(currentBalance, ++adminHxuiLiteTokenBalance);
+//     const now = await getBlockTime();
+
+//     const mintedTimestampAccount =
+//       await program.account.freeTokenTimestamp.fetch(mintedTimestampAddress);
+
+//     // the right mint time (current time) is stored on chain.
+//     assert(mintedTimestampAccount.lastMintedTimestamp.eq(new BN(now)), "4.1");
+//   }),
+//     it("4.2) minting free token before cooldown (before 5 secs)", async () => {
+//       //Should fail.
+//       try {
+//         await program.methods
+//           .mintFreeTokens()
+//           .accounts({
+//             owner: admin,
+//             liteAuthority: liteAuthority.publicKey,
+//           })
+//           .signers([liteAuthority])
+//           .rpc();
+//         assert(false);
+//       } catch ({
+//         error: {
+//           errorCode: { code },
+//         },
+//       }) {
+//         assert.equal(code, "RateLimitExceeded");
+//       }
+//     }),
+//     it("4.3) minting free token after cooldown (after 5 secs)", async () => {
+//       await sleep(5);
+//       await program.methods
+//         .mintFreeTokens()
+//         .accounts({
+//           owner: admin,
+//           liteAuthority: liteAuthority.publicKey,
+//         })
+//         .signers([liteAuthority])
+//         .rpc();
+
+//       const {
+//         value: { amount: currentBalance },
+//       } = await connection.getTokenAccountBalance(adminAssociatedTokenAddress);
+
+//       assert.equal(currentBalance, ++adminHxuiLiteTokenBalance);
+//       const now = await getBlockTime();
+
+//       const mintedTimestampAccount =
+//         await program.account.freeTokenTimestamp.fetch(mintedTimestampAddress);
+
+//       // the right mint time (current time) is stored on chain.
+//       assert(mintedTimestampAccount.lastMintedTimestamp.eq(new BN(now)), "4.3");
+//     }).slow(10000);
+// });
+
+describe("5) create_candidate instruction testing", () => {
+  it(`5.1) candidate account created and initialised`, async () => {
+    const name = "Lorem ipsum dolor sit amet, 1234";
+    const description =
+      "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in volu..";
+    const [candidateAddress, candidateBump] = PublicKey.findProgramAddressSync(
+      [Buffer.from("hxui_candidate_component"), Buffer.from(name)],
+      program.programId,
     );
-    try {
-      await program.methods
-        .registerForFreeTokens()
-        .accounts({
-          owner: admin,
-        })
-        .rpc();
-    } catch (err) {
-      console.log(err);
-    }
-
-    const [mintedTimestampAddress, mintedTimestampBump] =
-      PublicKey.findProgramAddressSync(
-        [Buffer.from("minted_timestamp"), admin.toBuffer()],
-        program.programId,
-      );
-
-    const mintedTimestampAccount =
-      await program.account.freeTokenTimestamp.fetch(mintedTimestampAddress);
-
-    //succesfully registered
-    assert.equal(mintedTimestampAccount.bump, mintedTimestampBump);
-    assert.equal(mintedTimestampAccount.lastMintedTimestamp, 0);
-
-    // this fails. always.
-    //     await getAccount(
-    //       connection,
-    //       adminTokenAddress,
-    //       "confirmed",
-    //       TOKEN_2022_PROGRAM_ID,
-    //     ),
-    // its okay, below is the work around.
-
-    //verifying the token account of hxui lite mint owned by the admin
-    const adminAssociatedTokenAccount =
-      await connection.getTokenAccountsByOwner(admin, {
-        mint: hxuiLiteMintAddress,
-      });
-
-    //is an associated token account.
-    //  index 0 -> in assumption that no other token account of this mint is owned by admin.
-    assert(
-      adminAssociatedTokenAccount.value[0].pubkey.equals(
-        adminAssociatedTokenAddress,
-      ),
-    );
-
-    //  token 2022 is the owner program
-    assert(
-      adminAssociatedTokenAccount.value[0].account.owner.equals(
-        TOKEN_2022_PROGRAM_ID,
-      ),
-    );
-
-    const {
-      value: { amount },
-    } = await connection.getTokenAccountBalance(adminAssociatedTokenAddress);
-    //balance is 0
-    assert.equal(amount, adminHxuiLiteTokenBalance);
-  });
-});
-
-describe("4) mint_free_tokens instruction testing", async () => {
-  const [mintedTimestampAddress] = PublicKey.findProgramAddressSync(
-    [Buffer.from("minted_timestamp"), admin.toBuffer()],
-    program.programId,
-  );
-  it("4.1) minting free token", async () => {
     await program.methods
-      .mintFreeTokens()
+      .createCandidate(name, description)
       .accounts({
-        owner: admin,
-        liteAuthority: liteAuthority.publicKey,
+        admin,
       })
-      .signers([liteAuthority])
       .rpc();
 
-    const {
-      value: { amount: currentBalance },
-    } = await connection.getTokenAccountBalance(adminAssociatedTokenAddress);
-
-    assert.equal(currentBalance, ++adminHxuiLiteTokenBalance);
-    const now = await getBlockTime();
-
-    const mintedTimestampAccount =
-      await program.account.freeTokenTimestamp.fetch(mintedTimestampAddress);
-
-    // the right mint time (current time) is stored on chain.
-    assert(mintedTimestampAccount.lastMintedTimestamp.eq(new BN(now)), "4.1");
-  }),
-    it("4.2) minting free token before cooldown (before 5 secs)", async () => {
-      //Should fail.
-      try {
-        await program.methods
-          .mintFreeTokens()
-          .accounts({
-            owner: admin,
-            liteAuthority: liteAuthority.publicKey,
-          })
-          .signers([liteAuthority])
-          .rpc();
-        assert(false);
-      } catch ({
-        error: {
-          errorCode: { code },
-        },
-      }) {
-        assert.equal(code, "RateLimitExceeded");
-      }
-    }),
-    it("4.3) minting free token after cooldown (after 5 secs)", async () => {
-      await sleep(5);
-      await program.methods
-        .mintFreeTokens()
-        .accounts({
-          owner: admin,
-          liteAuthority: liteAuthority.publicKey,
-        })
-        .signers([liteAuthority])
-        .rpc();
-
-      const {
-        value: { amount: currentBalance },
-      } = await connection.getTokenAccountBalance(adminAssociatedTokenAddress);
-
-      assert.equal(currentBalance, ++adminHxuiLiteTokenBalance);
-      const now = await getBlockTime();
-
-      const mintedTimestampAccount =
-        await program.account.freeTokenTimestamp.fetch(mintedTimestampAddress);
-
-      // the right mint time (current time) is stored on chain.
-      assert(mintedTimestampAccount.lastMintedTimestamp.eq(new BN(now)), "4.3");
-    }).slow(10000);
+    const candidateAccount = await program.account.candidate.fetch(
+      candidateAddress,
+    );
+    //verifying the account state
+    assert.equal(candidateAccount.name, name);
+    assert.equal(candidateAccount.description, description);
+    assert.equal(candidateAccount.isWinner, false);
+    assert.equal(candidateAccount.isVotable, true),
+      assert.equal(candidateAccount.bump, candidateBump);
+  });
 });

@@ -12,3 +12,6 @@ pub use register_for_free_tokens::*;
 
 pub mod mint_free_tokens;
 pub use mint_free_tokens::*;
+
+pub mod create_candidate;
+pub use create_candidate::*;

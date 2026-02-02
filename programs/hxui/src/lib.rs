@@ -44,4 +44,8 @@ pub mod hxui {
     pub fn mint_free_tokens(ctx:Context<MintFreeTokens>)->Result<()>{
         instructions::mint_free_tokens::mint_tokens(ctx,1)
     }
+    
+    pub fn create_candidate(ctx:Context<CreateCandidate>,name:String,description:String)->Result<()>{
+        instructions::create_candidate::initialise_candidate(ctx,name,description)
+    }
 }
