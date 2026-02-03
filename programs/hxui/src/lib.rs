@@ -29,6 +29,8 @@ pub mod hxui {
                 bump:config_bump
             }
         )
+
+        
     }
     pub fn create_poll(ctx:Context<CreatePoll>,poll_deadline:i64)->Result<()>{
         instructions::create_poll::create_new_poll(ctx, poll_deadline)
@@ -42,10 +44,19 @@ pub mod hxui {
         instructions::register_for_free_tokens::initialise_hxui_lite_minted_timestamp(ctx)
     }  
     pub fn mint_free_tokens(ctx:Context<MintFreeTokens>)->Result<()>{
-        instructions::mint_free_tokens::mint_tokens(ctx,1)
+        instructions::mint_free_tokens::mint_tokens_for_free(ctx,1)
     }
     
     pub fn create_candidate(ctx:Context<CreateCandidate>,name:String,description:String)->Result<()>{
         instructions::create_candidate::initialise_candidate(ctx,name,description)
+    }
+
+    pub fn fund_admin_for_candidate(ctx:Context<FundAdminForCandidate>)->Result<()>{
+        instructions::fund_admin_for_candidate::transfer_rent_to_admin(ctx)
+    }
+
+     pub fn buy_paid_tokens(ctx:Context<BuyPaidTokens>,amount:u64)->Result<()>{
+        instructions::buy_paid_tokens::payment(&ctx,&amount)?;
+        instructions::buy_paid_tokens::mint_tokens(ctx,amount)
     }
 }

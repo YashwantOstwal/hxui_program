@@ -40,7 +40,7 @@ pub struct MintFreeTokens<'info>{
     pub token_program:Program<'info,Token2022>
 }
 
-pub fn mint_tokens(ctx:Context<MintFreeTokens>,amount:u64)->Result<()>{
+pub fn mint_tokens_for_free(ctx:Context<MintFreeTokens>,amount:u64)->Result<()>{
     let clock = Clock::get()?;
     let hxui_lite_minted_timestamp = &mut ctx.accounts.hxui_lite_minted_timestamp;
     require!(hxui_lite_minted_timestamp.last_minted_timestamp == 0 || (clock.unix_timestamp - hxui_lite_minted_timestamp.last_minted_timestamp >= 5),CustomError::RateLimitExceeded);

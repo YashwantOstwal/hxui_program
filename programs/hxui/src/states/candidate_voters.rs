@@ -10,5 +10,6 @@ pub struct Voter {
 #[derive(InitSpace)]
 pub struct CandidateVoters{
     #[max_len(0)]
-    voters:Vec<Voter>
+    pub voters:Vec<Voter>,
+    pub bump:u8,
 }

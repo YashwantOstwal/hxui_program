@@ -1,11 +1,11 @@
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, system_program::{Transfer, transfer}};
 use anchor_spl::{
     token_interface::{ Mint,Token2022},
 };
 
 
 
-use crate::{Config,ANCHOR_DISCRIMINATOR};
+use crate::{Config,ANCHOR_DISCRIMINATOR,Voter,CustomError};
 #[derive(Accounts)]
 pub struct InitialiseDapp<'info>{
     #[account(mut)]
@@ -14,6 +14,7 @@ pub struct InitialiseDapp<'info>{
     pub lite_authority :SystemAccount<'info>,
 
     #[account(
+        mut,
         seeds = [b"hxui_vault"],
         bump
     )]
@@ -25,7 +26,7 @@ pub struct InitialiseDapp<'info>{
         seeds = [b"hxui_mint"],
         bump,
         mint::decimals = 0,
-        mint::authority = hxui_vault,
+        mint::authority = hxui_mint,
         mint::token_program = token_program
     )]
     pub hxui_mint:InterfaceAccount<'info,Mint>,
@@ -55,7 +56,16 @@ pub struct InitialiseDapp<'info>{
 }
 
 pub fn initialise_config(ctx:Context<InitialiseDapp>,config:Config)->Result<()>{
+    let rent = Rent::get()?;
+    require!(config.price_per_token >= rent.minimum_balance(Voter::INIT_SPACE) - rent.minimum_balance(0),CustomError::TokenPriceNotSufficient);
     let config_account = &mut ctx.accounts.hxui_config;
     config_account.set_inner(config);
-    Ok(())
+
+    let cpi_context = CpiContext::new(ctx.accounts.system_program.to_account_info(),Transfer{
+        from:ctx.accounts.admin.to_account_info(),
+        to:ctx.accounts.hxui_vault.to_account_info()
+    });
+    let rent = (Rent::get()?).minimum_balance(0);
+
+    transfer(cpi_context, rent)
 }

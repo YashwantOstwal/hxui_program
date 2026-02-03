@@ -15,3 +15,10 @@ pub use mint_free_tokens::*;
 
 pub mod create_candidate;
 pub use create_candidate::*;
+
+pub mod fund_admin_for_candidate;
+pub use fund_admin_for_candidate::*;
+
+pub mod buy_paid_tokens;
+pub use buy_paid_tokens::*;
+
