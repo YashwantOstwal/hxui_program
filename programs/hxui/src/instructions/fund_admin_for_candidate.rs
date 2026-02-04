@@ -45,7 +45,7 @@ pub fn transfer_rent_to_admin(ctx:Context<FundAdminForCandidate>)->Result<()>{
     let hxui_vault =&ctx.accounts.hxui_vault;
     let admin = &ctx.accounts.admin;
 
-    let vault_balance: u64 = **hxui_vault.lamports.borrow();
+    let vault_balance: u64 = hxui_vault.lamports();
     let minimum_vault_balance = rent.minimum_balance(hxui_mint.supply.div_euclid(ctx.accounts.hxui_config.tokens_per_vote)  as usize * Voter::INIT_SPACE);
     
     let candidate_creation_rent =  rent.minimum_balance(ANCHOR_DISCRIMINATOR + Candidate::INIT_SPACE) + rent.minimum_balance(ANCHOR_DISCRIMINATOR + CandidateVoters::INIT_SPACE);

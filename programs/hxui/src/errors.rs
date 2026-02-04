@@ -20,9 +20,18 @@ pub enum CustomError {
     #[msg("Description must not be greater than 280 characters")]
     DescriptionTooLong,
 
-    #[msg("Not Enough funds in the vault to afford creation of candidate accounts and voters record.")]
+    #[msg("Not Enough funds in the vault to afford this transfer.")]
     InsufficientFunds,
 
     #[msg("Token price economically does not make sense.")]
-    TokenPriceNotSufficient
+    TokenPriceNotSufficient,
+
+    #[msg("Only admin can invoke this instruction")]
+    OnlyAdminAccess,
+
+    #[msg("The candidate is already a winner.")]
+    CandidateAlreadyAWinner,
+
+    #[msg("The candidate is no longer votable.")]
+    CandidateIsNoLongerVotable
 }

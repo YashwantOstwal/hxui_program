@@ -19,10 +19,11 @@ pub struct RegisterFreeTokens<'info>{
     )]
     pub hxui_lite_token_account:InterfaceAccount<'info,TokenAccount>,
 
-    #[account(
-        mint::token_program = token_program,
+      #[account(
         seeds = [b"hxui_lite_mint"],
         bump,
+        mint::decimals = 0,
+        mint::token_program = token_program,
     )]
     pub hxui_lite_mint:InterfaceAccount<'info,Mint>,
 

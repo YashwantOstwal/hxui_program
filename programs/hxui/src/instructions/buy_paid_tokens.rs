@@ -61,7 +61,7 @@ Transfer{
 
 
 pub fn mint_tokens(ctx:Context<BuyPaidTokens>,amount:u64)->Result<()>{
-    let seeds: &[&[u8]] = &[b"hxui_mint"];
+    let seeds: &[&[u8]] = &[b"hxui_mint",&[ctx.bumps.hxui_mint]];
     let signer_seeds: [&[&[u8]]; 1] = [&seeds[..]];
     let cpi_context = CpiContext::new(ctx.accounts.token_program.to_account_info(),
 MintTo{

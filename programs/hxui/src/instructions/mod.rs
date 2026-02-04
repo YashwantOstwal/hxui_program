@@ -22,3 +22,10 @@ pub use fund_admin_for_candidate::*;
 pub mod buy_paid_tokens;
 pub use buy_paid_tokens::*;
 
+pub mod safe_withdraw_from_vault;
+pub use safe_withdraw_from_vault::*;
+
+pub mod vote_candidate;
+pub use vote_candidate::*;
+
+
