@@ -63,7 +63,7 @@ pub mod hxui {
     pub fn safe_withdraw_from_vault(ctx:Context<SafeWithdrawFromVault>,amount:Option<u64>)->Result<()>{
         instructions::safe_withdraw_from_vault::transfer_to_admin(ctx,amount)
     }
-    pub fn vote_candidate(ctx:Context<VoteCandidate>,votes:u64)->Result<()>{
+    pub fn vote_candidate(ctx:Context<VoteCandidate>,_name:String,votes:u64)->Result<()>{
         instructions::vote_candidate::vote(ctx,votes)
     }
 }

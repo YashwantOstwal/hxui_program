@@ -3,8 +3,8 @@ use anchor_lang::prelude::*;
 #[account]
 #[derive(InitSpace)]
 pub struct Voter {
-    voter:Pubkey,
-    votes:u64
+    pub voter:Pubkey,
+    pub votes:u64
 }
 #[account]
 #[derive(InitSpace)]

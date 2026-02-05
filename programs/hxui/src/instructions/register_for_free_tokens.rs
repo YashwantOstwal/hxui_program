@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use anchor_spl::{
     associated_token::AssociatedToken,
-    token_interface::{Mint,TokenAccount,Token2022},
+    token_interface::{Mint,Token2022},
 };
 use crate::{ANCHOR_DISCRIMINATOR,FreeTokenTimestamp};
 #[derive(Accounts)]
@@ -10,14 +10,14 @@ pub struct RegisterFreeTokens<'info>{
     #[account(mut)]
     pub owner:Signer<'info>,
 
-    #[account(
-        init,
-        payer = owner,
-        associated_token::authority = owner,
-        associated_token::mint = hxui_lite_mint,
-        associated_token::token_program = token_program
-    )]
-    pub hxui_lite_token_account:InterfaceAccount<'info,TokenAccount>,
+    // #[account(
+    //     init,
+    //     payer = owner,
+    //     associated_token::authority = owner,
+    //     associated_token::mint = hxui_lite_mint,
+    //     associated_token::token_program = token_program
+    // )]
+    // pub hxui_lite_token_account:InterfaceAccount<'info,TokenAccount>,
 
       #[account(
         seeds = [b"hxui_lite_mint"],
