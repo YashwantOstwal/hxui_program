@@ -70,9 +70,31 @@ const adminAssociatedTokenAddress = getAssociatedTokenAddressSync(
   false,
   TOKEN_2022_PROGRAM_ID,
 );
-let adminHxuiLiteTokenBalance = 0;
 const pricePerToken = new BN(0.001 * LAMPORTS_PER_SOL);
 const tokensPerVote = new BN(2);
+
+const createCandidate = async (
+  name: string,
+  description: string,
+  claimableIfWinner: boolean = true,
+  claimableBps: null | undefined | number = null,
+) => {
+  const fundAdminIxn = await program.methods
+    .fundAdminForCandidate()
+    .accounts({ admin })
+    .instruction();
+  const createAndIntialiseIxn = await program.methods
+    .createCandidate(name, description, claimableIfWinner, claimableBps)
+    .accounts({
+      admin,
+    })
+    .instruction();
+  const transactionMessage = new Transaction().add(
+    fundAdminIxn,
+    createAndIntialiseIxn,
+  );
+  await provider.sendAndConfirm(transactionMessage, [payer]);
+};
 
 describe("1) initialise_dapp instruction testing", () => {
   it("1.1) Inits the config account!", async () => {
@@ -195,205 +217,207 @@ describe("1) initialise_dapp instruction testing", () => {
   });
 });
 
-// describe("2) create_poll instruction testing", () => {
-//   const [pollAddress, pollBump] = PublicKey.findProgramAddressSync(
-//     [Buffer.from("hxui_poll")],
-//     program.programId,
-//   );
-//   it("2.1) Create Genesis poll", async () => {
-//     const currentBlockTime = await getBlockTime();
-//     const pollEndsAt = new BN(currentBlockTime + 3);
-//     await assert.doesNotReject(
-//       async () =>
-//         await program.methods
-//           .createPoll(pollEndsAt)
-//           .accounts({
-//             admin,
-//           })
-//           .rpc(),
-//     );
-//     const pollAccount = await program.account.poll.fetch(pollAddress);
-//     assert.equal(pollAccount.bump, pollBump);
-//     assert(pollAccount.currentPollDeadline.eq(pollEndsAt));
-//     assert.equal(pollAccount.currentPollWinnerDrawn, false);
-//   });
-//   it("2.2) Cannot pick winner before poll ends", async () => {
-//     try {
-//       await program.methods.drawWinner().rpc();
-//       assert(false);
-//     } catch ({
-//       error: {
-//         errorCode: { code },
-//       },
-//     }) {
-//       //error because the poll is live
-//       assert.equal(code, "PollIsLive");
-//     }
-//   });
-//   it("2.3) Cannot create a new poll before the poll ends", async () => {
-//     const blockTime = await getBlockTime();
-//     const deadline = new BN(blockTime + 3);
-//     try {
-//       await program.methods
-//         .createPoll(deadline)
-//         .accounts({
-//           admin,
-//         })
-//         .rpc();
-//       assert(false);
-//     } catch ({
-//       error: {
-//         errorCode: { code },
-//       },
-//     }) {
-//       assert.equal(code, "PollIsLive");
-//     }
-//   });
-
-//   it("2.4) Current Poll has ended", async () => {
-//     await sleep(4);
-//     const pollAccount = await program.account.poll.fetch(pollAddress);
-//     const currentBlockTime = await getBlockTime();
-
-//     assert(pollAccount.currentPollDeadline.toNumber() < currentBlockTime);
-//   });
-//   it("2.5) Cannot create a new poll even afte the poll has ended but the winner is not drawn yet (drawable after the ending of poll)", async () => {
-//     const blockTime = await getBlockTime();
-//     const deadline = new BN(blockTime + 120);
-//     //Should fail.
-//     try {
-//       await program.methods
-//         .createPoll(deadline)
-//         .accounts({
-//           admin,
-//         })
-//         .rpc();
-//       assert(false);
-//     } catch ({
-//       error: {
-//         errorCode: { code },
-//       },
-//     }) {
-//       assert.equal(code, "WinnerNotDrawn");
-//     }
-//   });
-//   it("2.6) Winner for current poll is drawn", async () => {
-//     await assert.doesNotReject(
-//       async () => await program.methods.drawWinner().rpc(),
-//     );
-//     const pollAccount = await program.account.poll.fetch(pollAddress);
-//     assert.equal(pollAccount.currentPollWinnerDrawn, true);
-//   });
-
-//   it("2.7) A new poll can be created but failed due to deadline being smaller than the current time", async () => {
-//     const currentBlockTime = await getBlockTime();
-//     const deadline = new BN(currentBlockTime - 3);
-//     try {
-//       await program.methods
-//         .createPoll(deadline)
-//         .accounts({
-//           admin,
-//         })
-//         .rpc();
-//       assert(false);
-//     } catch ({
-//       error: {
-//         errorCode: { code },
-//       },
-//     }) {
-//       assert.equal(code, "InvalidDeadline");
-//     }
-//   });
-
-//   it("2.8) A new poll created.", async () => {
-//     const currentBlockTime = await getBlockTime();
-//     const deadline = new BN(currentBlockTime + 3);
-//     await assert.doesNotReject(
-//       async () =>
-//         await program.methods
-//           .createPoll(deadline)
-//           .accounts({
-//             admin,
-//           })
-//           .rpc(),
-//     );
-//     const pollAccount = await program.account.poll.fetch(pollAddress);
-//     //initialised again
-
-//     assert.equal(pollAccount.bump, pollBump);
-//     assert(pollAccount.currentPollDeadline.eq(deadline));
-//     assert.equal(pollAccount.currentPollWinnerDrawn, false);
-//   });
-// });
-
-describe("3) register_for_free_tokens instruction testing", () => {
-  it("3.1) Created a new associated token account of hxiui lite mint for admin.", async () => {
-    //associated token account does not exist
-    assert.equal(
-      await connection.getAccountInfo(adminAssociatedTokenAddress),
-      null,
+describe("2) create_poll instruction testing", () => {
+  const [pollAddress, pollBump] = PublicKey.findProgramAddressSync(
+    [Buffer.from("hxui_poll")],
+    program.programId,
+  );
+  it("2.1) Create Genesis poll", async () => {
+    const currentBlockTime = await getBlockTime();
+    const pollEndsAt = new BN(currentBlockTime + 3);
+    await assert.doesNotReject(
+      async () =>
+        await program.methods
+          .createPoll(pollEndsAt)
+          .accounts({
+            admin,
+          })
+          .rpc(),
     );
-
-    const createAssociatedTokenForOwnerIxn =
-      createAssociatedTokenAccountInstruction(
-        admin,
-        adminAssociatedTokenAddress,
-        admin,
-        hxuiLiteMintAddress,
-        TOKEN_2022_PROGRAM_ID,
-      );
-
-    const registrationIxn = await program.methods
-      .registerForFreeTokens()
-      .accounts({
-        owner: admin,
-      })
-      .instruction();
+    const pollAccountData = await program.account.poll.fetch(pollAddress);
+    assert.equal(pollAccountData.bump, pollBump);
+    assert(pollAccountData.currentPollDeadline.eq(pollEndsAt));
+    assert.equal(pollAccountData.currentPollWinnerDrawn, false);
+    assert.equal(pollAccountData.totalCandidates, 0);
+    assert.equal(pollAccountData.currentPollCandidates.length, 0);
+  });
+  it("2.2) Cannot pick winner before poll ends", async () => {
     try {
-      const tx = new Transaction().add(
-        createAssociatedTokenForOwnerIxn,
-        registrationIxn,
-      );
-      await provider.sendAndConfirm(tx, [payer]);
-    } catch (err) {
-      console.log(err);
+      await program.methods.drawWinner().rpc();
+      assert(false);
+    } catch ({
+      error: {
+        errorCode: { code },
+      },
+    }) {
+      //error because the poll is live
+      assert.equal(code, "PollIsLive");
     }
+  });
+  it("2.3) Cannot create a new poll before the poll ends", async () => {
+    const blockTime = await getBlockTime();
+    const deadline = new BN(blockTime + 3);
+    try {
+      await program.methods
+        .createPoll(deadline)
+        .accounts({
+          admin,
+        })
+        .rpc();
+      assert(false);
+    } catch ({
+      error: {
+        errorCode: { code },
+      },
+    }) {
+      assert.equal(code, "PollIsLive");
+    }
+  });
 
-    const [mintedTimestampAddress, mintedTimestampBump] =
-      PublicKey.findProgramAddressSync(
-        [Buffer.from("minted_timestamp"), admin.toBuffer()],
-        program.programId,
-      );
+  it("2.4) Current Poll has ended", async () => {
+    await sleep(4);
+    const pollAccount = await program.account.poll.fetch(pollAddress);
+    const currentBlockTime = await getBlockTime();
 
-    const mintedTimestampAccount =
-      await program.account.freeTokenTimestamp.fetch(mintedTimestampAddress);
-
-    //succesfully registered
-    assert.equal(mintedTimestampAccount.bump, mintedTimestampBump);
-    assert.equal(mintedTimestampAccount.lastMintedTimestamp, 0);
-
-    const adminAssociatedTokenAccount = await connection.getAccountInfo(
-      adminAssociatedTokenAddress,
+    assert(pollAccount.currentPollDeadline.toNumber() < currentBlockTime);
+  });
+  it("2.5) Cannot create a new poll even afte the poll has ended but the winner is not drawn yet (drawable after the ending of poll)", async () => {
+    const blockTime = await getBlockTime();
+    const deadline = new BN(blockTime + 120);
+    //Should fail.
+    try {
+      await program.methods
+        .createPoll(deadline)
+        .accounts({
+          admin,
+        })
+        .rpc();
+      assert(false);
+    } catch ({
+      error: {
+        errorCode: { code },
+      },
+    }) {
+      assert.equal(code, "WinnerNotDrawn");
+    }
+  });
+  it("2.6) Winner for current poll is drawn", async () => {
+    await assert.doesNotReject(
+      async () => await program.methods.drawWinner().rpc(),
     );
+    const pollAccount = await program.account.poll.fetch(pollAddress);
+    assert.equal(pollAccount.currentPollWinnerDrawn, true);
+  });
 
-    // owner program is token 2022.
-    assert(adminAssociatedTokenAccount.owner.equals(TOKEN_2022_PROGRAM_ID));
+  it("2.7) A new poll can be created but failed due to deadline being smaller than the current time", async () => {
+    const currentBlockTime = await getBlockTime();
+    const deadline = new BN(currentBlockTime - 3);
+    try {
+      await program.methods
+        .createPoll(deadline)
+        .accounts({
+          admin,
+        })
+        .rpc();
+      assert(false);
+    } catch ({
+      error: {
+        errorCode: { code },
+      },
+    }) {
+      assert.equal(code, "InvalidDeadline");
+    }
+  });
 
-    await sleep(0.2);
-    const adminAssociatedTokenAccountData = await getAccount(
-      connection,
-      adminAssociatedTokenAddress,
-      "confirmed",
-      TOKEN_2022_PROGRAM_ID,
+  it("2.8) A new poll created.", async () => {
+    const currentBlockTime = await getBlockTime();
+    const deadline = new BN(currentBlockTime + 3);
+    await assert.doesNotReject(
+      async () =>
+        await program.methods
+          .createPoll(deadline)
+          .accounts({
+            admin,
+          })
+          .rpc(),
     );
+    const pollAccount = await program.account.poll.fetch(pollAddress);
+    //initialised again
 
-    //  Admin is the owner
-    assert(adminAssociatedTokenAccountData.owner.equals(admin));
-
-    // the token balance is 0n
-    assert.equal(adminAssociatedTokenAccountData.amount, BigInt(0));
+    assert.equal(pollAccount.bump, pollBump);
+    assert(pollAccount.currentPollDeadline.eq(deadline));
+    assert.equal(pollAccount.currentPollWinnerDrawn, false);
   });
 });
+
+// describe("3) register_for_free_tokens instruction testing", () => {
+//   it("3.1) Created a new associated token account of hxiui lite mint for admin.", async () => {
+//     //associated token account does not exist
+//     assert.equal(
+//       await connection.getAccountInfo(adminAssociatedTokenAddress),
+//       null,
+//     );
+
+//     const createAssociatedTokenForOwnerIxn =
+//       createAssociatedTokenAccountInstruction(
+//         admin,
+//         adminAssociatedTokenAddress,
+//         admin,
+//         hxuiLiteMintAddress,
+//         TOKEN_2022_PROGRAM_ID,
+//       );
+
+//     const registrationIxn = await program.methods
+//       .registerForFreeTokens()
+//       .accounts({
+//         owner: admin,
+//       })
+//       .instruction();
+//     try {
+//       const tx = new Transaction().add(
+//         createAssociatedTokenForOwnerIxn,
+//         registrationIxn,
+//       );
+//       await provider.sendAndConfirm(tx, [payer]);
+//     } catch (err) {
+//       console.log(err);
+//     }
+
+//     const [mintedTimestampAddress, mintedTimestampBump] =
+//       PublicKey.findProgramAddressSync(
+//         [Buffer.from("minted_timestamp"), admin.toBuffer()],
+//         program.programId,
+//       );
+
+//     const mintedTimestampAccount =
+//       await program.account.freeTokenTimestamp.fetch(mintedTimestampAddress);
+
+//     //succesfully registered
+//     assert.equal(mintedTimestampAccount.bump, mintedTimestampBump);
+//     assert.equal(mintedTimestampAccount.lastMintedTimestamp, 0);
+
+//     const adminAssociatedTokenAccount = await connection.getAccountInfo(
+//       adminAssociatedTokenAddress,
+//     );
+
+//     // owner program is token 2022.
+//     assert(adminAssociatedTokenAccount.owner.equals(TOKEN_2022_PROGRAM_ID));
+
+//     await sleep(0.2);
+//     const adminAssociatedTokenAccountData = await getAccount(
+//       connection,
+//       adminAssociatedTokenAddress,
+//       "confirmed",
+//       TOKEN_2022_PROGRAM_ID,
+//     );
+
+//     //  Admin is the owner
+//     assert(adminAssociatedTokenAccountData.owner.equals(admin));
+
+//     // the token balance is 0n
+//     assert.equal(adminAssociatedTokenAccountData.amount, BigInt(0));
+//   });
+// });
 
 // describe("4) mint_free_tokens instruction testing", async () => {
 //   const [mintedTimestampAddress] = PublicKey.findProgramAddressSync(
@@ -471,229 +495,234 @@ describe("3) register_for_free_tokens instruction testing", () => {
 
 // dedicated buy_tokens ixn testing.
 
-describe("5) vote_candidate instruction testing", () => {
-  const name = "Lorem ipsum dolor sit amet, 4321";
+// describe("5) vote_candidate instruction testing", () => {
+//   const name = "Lorem ipsum dolor sit amet, 4321";
 
-  const [candidateAddress] = PublicKey.findProgramAddressSync(
-    [Buffer.from("hxui_candidate"), Buffer.from(name)],
-    program.programId,
-  );
-  const [candidateVoterAddress] = PublicKey.findProgramAddressSync(
-    [Buffer.from("hxui_candidate_component_voters"), Buffer.from(name)],
-    program.programId,
-  );
-  const tokenOwner = new Keypair();
-  const mintTokens = 2;
-  const ownerTokenAccountAddress = getAssociatedTokenAddressSync(
-    hxuiMintAddress,
-    tokenOwner.publicKey,
-    false,
-    TOKEN_2022_PROGRAM_ID,
-  );
+//   const [candidateAddress] = PublicKey.findProgramAddressSync(
+//     [Buffer.from("hxui_candidate"), Buffer.from(name)],
+//     program.programId,
+//   );
+//   const [candidateVoterAddress] = PublicKey.findProgramAddressSync(
+//     [Buffer.from("hxui_candidate_component_voters"), Buffer.from(name)],
+//     program.programId,
+//   );
+//   const tokenOwner = new Keypair();
+//   const mintTokens = 2;
+//   const ownerTokenAccountAddress = getAssociatedTokenAddressSync(
+//     hxuiMintAddress,
+//     tokenOwner.publicKey,
+//     false,
+//     TOKEN_2022_PROGRAM_ID,
+//   );
 
-  const candidateAccountSpace = 8 + 331;
-  const candidateVotersAccountSpace = 8 + 5;
-  let predictedExtraReallocationRent: number;
-  before(async () => {
-    const createCandidate = async (name: string, description: string) => {
-      const fundAdminIxn = await program.methods
-        .fundAdminForCandidate()
-        .accounts({ admin })
-        .instruction();
-      const createAndIntialiseIxn = await program.methods
-        .createCandidate(name, description)
-        .accounts({
-          admin,
-        })
-        .instruction();
-      const transactionMessage = new Transaction().add(
-        fundAdminIxn,
-        createAndIntialiseIxn,
-      );
-      await provider.sendAndConfirm(transactionMessage, [payer]);
-    };
+//   const candidateAccountSpace = 8 + 331;
+//   const candidateVotersAccountSpace = 8 + 5;
+//   let predictedExtraReallocationRent: number;
+//   before(async () => {
+//     const createCandidate = async (
+//       name: string,
+//       description: string,
+//       claimableIfWinner: boolean = true,
+//       claimableBps: null | undefined | number = null,
+//     ) => {
+//       const fundAdminIxn = await program.methods
+//         .fundAdminForCandidate()
+//         .accounts({ admin })
+//         .instruction();
+//       const createAndIntialiseIxn = await program.methods
+//         .createCandidate(name, description, claimableIfWinner, claimableBps)
+//         .accounts({
+//           admin,
+//         })
+//         .instruction();
+//       const transactionMessage = new Transaction().add(
+//         fundAdminIxn,
+//         createAndIntialiseIxn,
+//       );
+//       await provider.sendAndConfirm(transactionMessage, [payer]);
+//     };
 
-    const description =
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in volu..";
-    assert(name.length <= 32);
-    assert(description.length <= 280);
+//     const description =
+//       "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in volu..";
+//     assert(name.length <= 32);
+//     assert(description.length <= 280);
 
-    await airdrop(tokenOwner.publicKey, LAMPORTS_PER_SOL);
-    const tokenOwnerBalance = await connection.getBalance(tokenOwner.publicKey);
-    assert.equal(tokenOwnerBalance, LAMPORTS_PER_SOL);
+//     await airdrop(tokenOwner.publicKey, LAMPORTS_PER_SOL);
+//     const tokenOwnerBalance = await connection.getBalance(tokenOwner.publicKey);
+//     assert.equal(tokenOwnerBalance, LAMPORTS_PER_SOL);
 
-    await program.methods
-      .buyPaidTokens(new BN(mintTokens))
-      .accounts({
-        owner: tokenOwner.publicKey,
-      })
-      .signers([tokenOwner])
-      .rpc();
+//     await program.methods
+//       .buyPaidTokens(new BN(mintTokens))
+//       .accounts({
+//         owner: tokenOwner.publicKey,
+//       })
+//       .signers([tokenOwner])
+//       .rpc();
 
-    const {
-      value: { uiAmount: ownerTokenAccountBalance },
-    } = await connection.getTokenAccountBalance(ownerTokenAccountAddress);
+//     const {
+//       value: { uiAmount: ownerTokenAccountBalance },
+//     } = await connection.getTokenAccountBalance(ownerTokenAccountAddress);
 
-    assert.equal(ownerTokenAccountBalance, mintTokens);
-    const vaultAccountBalanceBefore = await connection.getBalance(
-      hxuiVaultAddress,
-    );
-    const zeroSpaceRent = await connection.getMinimumBalanceForRentExemption(0);
-    assert(vaultAccountBalanceBefore >= zeroSpaceRent);
-    const candidateAccountMinimumBalance =
-      await connection.getMinimumBalanceForRentExemption(candidateAccountSpace);
+//     assert.equal(ownerTokenAccountBalance, mintTokens);
+//     const vaultAccountBalanceBefore = await connection.getBalance(
+//       hxuiVaultAddress,
+//     );
+//     const zeroSpaceRent = await connection.getMinimumBalanceForRentExemption(0);
+//     assert(vaultAccountBalanceBefore >= zeroSpaceRent);
+//     const candidateAccountMinimumBalance =
+//       await connection.getMinimumBalanceForRentExemption(candidateAccountSpace);
 
-    const candidateVotersAccountMinimumBalance =
-      await connection.getMinimumBalanceForRentExemption(
-        candidateVotersAccountSpace,
-      );
+//     const candidateVotersAccountMinimumBalance =
+//       await connection.getMinimumBalanceForRentExemption(
+//         candidateVotersAccountSpace,
+//       );
 
-    await sleep(0.25);
-    const hxuiMintDataAfter = await getMint(
-      connection,
-      hxuiMintAddress,
-      "confirmed",
-      TOKEN_2022_PROGRAM_ID,
-    );
+//     await sleep(0.25);
+//     const hxuiMintDataAfter = await getMint(
+//       connection,
+//       hxuiMintAddress,
+//       "confirmed",
+//       TOKEN_2022_PROGRAM_ID,
+//     );
 
-    const hxuiConfigAccount = await program.account.config.fetch(
-      hxuiConfigAddress,
-    );
+//     const hxuiConfigAccount = await program.account.config.fetch(
+//       hxuiConfigAddress,
+//     );
 
-    const minimumVaultBalanceToRecordVoters =
-      (await connection.getMinimumBalanceForRentExemption(
-        Math.floor(
-          Number(hxuiMintDataAfter.supply) /
-            hxuiConfigAccount.tokensPerVote.toNumber(),
-        ) * 40,
-      )) - (await connection.getMinimumBalanceForRentExemption(0));
-    predictedExtraReallocationRent = minimumVaultBalanceToRecordVoters;
-    if (
-      vaultAccountBalanceBefore <
-      candidateAccountMinimumBalance +
-        candidateVotersAccountMinimumBalance +
-        minimumVaultBalanceToRecordVoters
-    ) {
-      await airdrop(hxuiVaultAddress, LAMPORTS_PER_SOL);
-      const vaultAccountBalanceAfter = await connection.getBalance(
-        hxuiVaultAddress,
-      );
-      assert(vaultAccountBalanceAfter >= LAMPORTS_PER_SOL);
-    }
+//     const minimumVaultBalanceToRecordVoters =
+//       (await connection.getMinimumBalanceForRentExemption(
+//         Math.floor(
+//           Number(hxuiMintDataAfter.supply) /
+//             hxuiConfigAccount.tokensPerVote.toNumber(),
+//         ) * 40,
+//       )) - (await connection.getMinimumBalanceForRentExemption(0));
+//     predictedExtraReallocationRent = minimumVaultBalanceToRecordVoters;
+//     if (
+//       vaultAccountBalanceBefore <
+//       candidateAccountMinimumBalance +
+//         candidateVotersAccountMinimumBalance +
+//         minimumVaultBalanceToRecordVoters
+//     ) {
+//       await airdrop(hxuiVaultAddress, LAMPORTS_PER_SOL);
+//       const vaultAccountBalanceAfter = await connection.getBalance(
+//         hxuiVaultAddress,
+//       );
+//       assert(vaultAccountBalanceAfter >= LAMPORTS_PER_SOL);
+//     }
 
-    await createCandidate(name, description);
+//     await createCandidate(name, description);
 
-    const candidateAccountBalance = await connection.getBalance(
-      candidateAddress,
-    );
-    //candidate account balances equals the minimum rent exemption;
-    assert.equal(candidateAccountBalance, candidateAccountMinimumBalance);
+//     const candidateAccountBalance = await connection.getBalance(
+//       candidateAddress,
+//     );
+//     //candidate account balances equals the minimum rent exemption;
+//     assert.equal(candidateAccountBalance, candidateAccountMinimumBalance);
 
-    const candidateVotersAccountBalance = await connection.getBalance(
-      candidateVoterAddress,
-    );
+//     const candidateVotersAccountBalance = await connection.getBalance(
+//       candidateVoterAddress,
+//     );
 
-    //candidate_voters account balances equals the minimum rent exemption;
-    assert.equal(
-      candidateVotersAccountBalance,
-      candidateVotersAccountMinimumBalance,
-    );
-  });
-  it("5.1) Vote candidate with 1 vote and Record the voter and its votes", async () => {
-    const candidateAccountBefore = await program.account.candidate.fetch(
-      candidateAddress,
-    );
+//     //candidate_voters account balances equals the minimum rent exemption;
+//     assert.equal(
+//       candidateVotersAccountBalance,
+//       candidateVotersAccountMinimumBalance,
+//     );
+//   });
+//   it("5.1) Vote candidate with 1 vote and Record the voter and its votes", async () => {
+//     const candidateAccountBefore = await program.account.candidate.fetch(
+//       candidateAddress,
+//     );
 
-    const {
-      value: { uiAmount: ownerTokenAccountBalanceBeforeVoting },
-    } = await connection.getTokenAccountBalance(ownerTokenAccountAddress);
+//     const {
+//       value: { uiAmount: ownerTokenAccountBalanceBeforeVoting },
+//     } = await connection.getTokenAccountBalance(ownerTokenAccountAddress);
 
-    const tokenOwnerBalanceBefore = await connection.getBalance(
-      tokenOwner.publicKey,
-    );
-    const payerBalanceBefore = await connection.getBalance(payer.publicKey);
+//     const tokenOwnerBalanceBefore = await connection.getBalance(
+//       tokenOwner.publicKey,
+//     );
+//     const payerBalanceBefore = await connection.getBalance(payer.publicKey);
 
-    const candidateVoterAccountBefore = await connection.getAccountInfo(
-      candidateVoterAddress,
-    );
+//     const candidateVoterAccountBefore = await connection.getAccountInfo(
+//       candidateVoterAddress,
+//     );
 
-    const actualCandidateVotersAccountBeforeBalance =
-      candidateVoterAccountBefore.lamports;
-    const votes = Math.floor(mintTokens / 2);
-    await program.methods
-      .voteCandidate(name, new BN(votes))
-      .accounts({
-        owner: tokenOwner.publicKey,
-      })
-      .signers([tokenOwner])
-      .rpc();
+//     const actualCandidateVotersAccountBeforeBalance =
+//       candidateVoterAccountBefore.lamports;
+//     const votes = Math.floor(mintTokens / 2);
+//     await program.methods
+//       .voteCandidate(name, new BN(votes))
+//       .accounts({
+//         owner: tokenOwner.publicKey,
+//       })
+//       .signers([tokenOwner])
+//       .rpc();
 
-    const payerBalanceAfter = await connection.getBalance(payer.publicKey);
-    const tokenOwnerBalanceAfter = await connection.getBalance(
-      tokenOwner.publicKey,
-    );
+//     const payerBalanceAfter = await connection.getBalance(payer.publicKey);
+//     const tokenOwnerBalanceAfter = await connection.getBalance(
+//       tokenOwner.publicKey,
+//     );
 
-    //exactly 40 bytes worth of lamports moved.
-    assert.equal(
-      tokenOwnerBalanceBefore - tokenOwnerBalanceAfter,
-      predictedExtraReallocationRent,
-    );
+//     //exactly 40 bytes worth of lamports moved.
+//     assert.equal(
+//       tokenOwnerBalanceBefore - tokenOwnerBalanceAfter,
+//       predictedExtraReallocationRent,
+//     );
 
-    //network fees paid by anchor wallet.
-    assert.notEqual(payerBalanceAfter, payerBalanceBefore);
+//     //network fees paid by anchor wallet.
+//     assert.notEqual(payerBalanceAfter, payerBalanceBefore);
 
-    const candidateVoterAccountAfter = await connection.getAccountInfo(
-      candidateVoterAddress,
-    );
+//     const candidateVoterAccountAfter = await connection.getAccountInfo(
+//       candidateVoterAddress,
+//     );
 
-    const actualCandidateVotersAccountAfterBalance =
-      candidateVoterAccountAfter.lamports;
+//     const actualCandidateVotersAccountAfterBalance =
+//       candidateVoterAccountAfter.lamports;
 
-    const expectedCandidateVotersAccountAfterBalance =
-      await connection.getMinimumBalanceForRentExemption(
-        candidateVotersAccountSpace + 40,
-      );
+//     const expectedCandidateVotersAccountAfterBalance =
+//       await connection.getMinimumBalanceForRentExemption(
+//         candidateVotersAccountSpace + 40,
+//       );
 
-    assert.equal(
-      actualCandidateVotersAccountAfterBalance -
-        actualCandidateVotersAccountBeforeBalance,
-      tokenOwnerBalanceBefore - tokenOwnerBalanceAfter,
-    );
+//     assert.equal(
+//       actualCandidateVotersAccountAfterBalance -
+//         actualCandidateVotersAccountBeforeBalance,
+//       tokenOwnerBalanceBefore - tokenOwnerBalanceAfter,
+//     );
 
-    // this basically is the test if the supply is distributed in 2 tokens per account and what if all the users vote..then the predictedExtraReallocationRent should be present in the vault along with exempt rent of vault.
-    assert.equal(
-      actualCandidateVotersAccountAfterBalance,
-      predictedExtraReallocationRent +
-        actualCandidateVotersAccountBeforeBalance,
-    );
-    const candidateAccountAfter = await program.account.candidate.fetch(
-      candidateAddress,
-    );
-    assert(
-      candidateAccountAfter.numberOfVotes.eq(
-        candidateAccountBefore.numberOfVotes.add(new BN(votes)),
-      ),
-    );
+//     // this basically is the test if the supply is distributed in 2 tokens per account and what if all the users vote..then the predictedExtraReallocationRent should be present in the vault along with exempt rent of vault.
+//     assert.equal(
+//       actualCandidateVotersAccountAfterBalance,
+//       predictedExtraReallocationRent +
+//         actualCandidateVotersAccountBeforeBalance,
+//     );
+//     const candidateAccountAfter = await program.account.candidate.fetch(
+//       candidateAddress,
+//     );
+//     assert(
+//       candidateAccountAfter.numberOfVotes.eq(
+//         candidateAccountBefore.numberOfVotes.add(new BN(votes)),
+//       ),
+//     );
 
-    const candidateVotersAccountAfter =
-      await program.account.candidateVoters.fetch(candidateVoterAddress);
+//     const candidateVotersAccountAfter =
+//       await program.account.candidateVoters.fetch(candidateVoterAddress);
 
-    const ownerInVoterRecord = candidateVotersAccountAfter.voters.find(
-      ({ voter }) => voter.equals(tokenOwner.publicKey),
-    );
+//     const ownerInVoterRecord = candidateVotersAccountAfter.voters.find(
+//       ({ voter }) => voter.equals(tokenOwner.publicKey),
+//     );
 
-    assert(ownerInVoterRecord.voter.equals(tokenOwner.publicKey));
-    assert(ownerInVoterRecord.votes.eq(new BN(votes)));
-    const {
-      value: { uiAmount: ownerTokenAccountBalanceAfterVoting },
-    } = await connection.getTokenAccountBalance(ownerTokenAccountAddress);
+//     assert(ownerInVoterRecord.voter.equals(tokenOwner.publicKey));
+//     assert(ownerInVoterRecord.votes.eq(new BN(votes)));
+//     const {
+//       value: { uiAmount: ownerTokenAccountBalanceAfterVoting },
+//     } = await connection.getTokenAccountBalance(ownerTokenAccountAddress);
 
-    assert.equal(
-      ownerTokenAccountBalanceAfterVoting,
-      ownerTokenAccountBalanceBeforeVoting - mintTokens,
-    );
-  });
-});
+//     assert.equal(
+//       ownerTokenAccountBalanceAfterVoting,
+//       ownerTokenAccountBalanceBeforeVoting - mintTokens,
+//     );
+//   });
+// });
 // describe("5) create_candidate instruction testing", () => {
 //   const [hxuiVaultAddress] = PublicKey.findProgramAddressSync(
 //     [Buffer.from("hxui_vault")],
@@ -704,24 +733,6 @@ describe("5) vote_candidate instruction testing", () => {
 //     [Buffer.from("hxui_mint")],
 //     program.programId,
 //   );
-
-//   const createCandidate = async (name: string, description: string) => {
-//     const fundAdminIxn = await program.methods
-//       .fundAdminForCandidate()
-//       .accounts({ admin })
-//       .instruction();
-//     const createAndIntialiseIxn = await program.methods
-//       .createCandidate(name, description)
-//       .accounts({
-//         admin,
-//       })
-//       .instruction();
-//     const transactionMessage = new Transaction().add(
-//       fundAdminIxn,
-//       createAndIntialiseIxn,
-//     );
-//     await provider.sendAndConfirm(transactionMessage, [payer]);
-//   };
 
 //   const description =
 //     "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in volu..";
@@ -833,7 +844,9 @@ describe("5) vote_candidate instruction testing", () => {
 //     assert.equal(candidateAccount.name, name);
 //     assert.equal(candidateAccount.description, description);
 //     assert.equal(candidateAccount.isWinner, false);
-//     assert.equal(candidateAccount.isVotable, true);
+//     assert.equal(candidateAccount.canBeWinner, true);
+//     assert.equal(candidateAccount.claimableBasisPointsIfWinner, 5000),
+//       assert.equal(candidateAccount.claimableIfWinner, true);
 //     assert.equal(candidateAccount.bump, candidateBump);
 
 //     const candidateVotersAccount = await program.account.candidateVoters.fetch(

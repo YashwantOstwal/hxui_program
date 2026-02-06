@@ -33,5 +33,20 @@ pub enum CustomError {
     CandidateAlreadyAWinner,
 
     #[msg("The candidate is no longer votable.")]
-    CandidateIsNoLongerVotable
+    CandidateIsNoLongerVotable,
+
+    #[msg("The registration fees can be claimed only after 12 hours of unregistration.")]
+    UnclaimableYet,
+
+    #[msg("Already unregistered.")]
+    AlreadyUnregistered,
+
+    #[msg("UnregisteredFreeTokens.")]
+    UnregisteredFreeTokens,
+
+    #[msg("Winner for current poll is already drawn.")]
+    WinnerForCurrentPollAlreadyDrawn,
+
+    #[msg("Pass all the candidate.")]
+    MissingCandidate
 }

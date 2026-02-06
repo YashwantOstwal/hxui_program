@@ -3,6 +3,7 @@ use anchor_lang::prelude::*;
 #[account]
 #[derive(InitSpace)]
 pub struct Candidate{
+    pub id:u32,
     #[max_len(32)]
     pub name:String,
 
@@ -11,7 +12,11 @@ pub struct Candidate{
 
     pub number_of_votes:u64,
     pub is_winner:bool,
-    pub is_votable:bool,
+    pub can_be_winner:bool,
+    pub claimable_if_winner:bool,
+    pub claimable_basis_points_if_winner:u16,
+    pub claim_window:i64,
+    pub enrolled_at:i64,
     pub bump:u8
 
 }

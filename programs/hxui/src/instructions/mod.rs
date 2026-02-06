@@ -28,4 +28,14 @@ pub use safe_withdraw_from_vault::*;
 pub mod vote_candidate;
 pub use vote_candidate::*;
 
+pub mod unregister_for_free_tokens;
+pub use unregister_for_free_tokens::*;
+
+pub mod cancel_unregister_for_free_tokens;
+pub use cancel_unregister_for_free_tokens::*;
+
+pub mod claim_registration;
+pub use claim_registration::*;
+
+
 

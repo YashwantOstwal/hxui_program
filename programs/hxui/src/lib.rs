@@ -13,6 +13,8 @@ declare_id!("EpF1FNjziFb8wrR1p5usVW1AbcU7saCt8deoiVY31zE7");
 
 #[program]
 pub mod hxui {
+    use crate::instruction::ClaimRegistrationFees;
+
     use super::*;
 
     pub fn initialise_dapp(ctx:Context<InitialiseDapp>,price_per_token:u64,tokens_per_vote:u64,is_claim_back_offer_live:bool,claim_basis_points:u32)->Result<()>{
@@ -43,12 +45,27 @@ pub mod hxui {
     pub fn register_for_free_tokens(ctx:Context<RegisterFreeTokens>)->Result<()>{
         instructions::register_for_free_tokens::initialise_hxui_lite_minted_timestamp(ctx)
     }  
+
+    pub fn unregister_for_free_tokens(ctx:Context<UnregisterFreeTokens>)->Result<()>{
+        instructions::unregister_for_free_tokens::set_close_time(ctx)
+    }
+
+    pub fn cancel_unregister_for_free_tokens(ctx:Context<CancelUnRegisterForFreeTokens>)->Result<()>{
+        instructions::cancel_unregister_for_free_tokens::reset_close_time(ctx)
+    }
+
+      pub fn claim_registration_fees(ctx:Context<ClaimRegistration>)->Result<()>{
+        instructions::claim_registration::close_last_minted_timestamp(ctx)
+    }
+
     pub fn mint_free_tokens(ctx:Context<MintFreeTokens>)->Result<()>{
         instructions::mint_free_tokens::mint_tokens_for_free(ctx,1)
     }
     
-    pub fn create_candidate(ctx:Context<CreateCandidate>,name:String,description:String)->Result<()>{
-        instructions::create_candidate::initialise_candidate(ctx,name,description)
+    pub fn create_candidate(ctx:Context<CreateCandidate>,name:String,description:String,
+    claimable_if_winner:bool,claimable_bps:Option<u16>)->Result<()>{
+        instructions::create_candidate::initialise_candidate(ctx,name,description,
+        claimable_if_winner,claimable_bps)
     }
 
     pub fn fund_admin_for_candidate(ctx:Context<FundAdminForCandidate>)->Result<()>{
@@ -66,4 +83,5 @@ pub mod hxui {
     pub fn vote_candidate(ctx:Context<VoteCandidate>,_name:String,votes:u64)->Result<()>{
         instructions::vote_candidate::vote(ctx,votes)
     }
+
 }

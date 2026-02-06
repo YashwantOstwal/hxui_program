@@ -32,12 +32,9 @@ pub fn create_new_poll(ctx:Context<CreatePoll>,new_deadline:i64)->Result<()>{
         require!(clock.unix_timestamp > poll.current_poll_deadline,CustomError::PollIsLive);
         require!(poll.current_poll_winner_drawn,CustomError::WinnerNotDrawn);
     }
-    require!(new_deadline > clock.unix_timestamp,CustomError::InvalidDeadline); 
-
-    if poll.current_poll_deadline == 0 || poll.current_poll_winner_drawn{
+    require!(new_deadline > clock.unix_timestamp,CustomError::InvalidDeadline);
         poll.current_poll_deadline = new_deadline;
         poll.current_poll_winner_drawn = false;
-    }
     poll.bump = ctx.bumps.hxui_poll;
     Ok(())
 }

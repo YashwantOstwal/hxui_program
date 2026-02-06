@@ -11,6 +11,7 @@ pub struct MintFreeTokens<'info>{
     pub owner:SystemAccount<'info>,
 
     pub lite_authority:Signer<'info>,
+    
      #[account(
         mut,
         associated_token::authority = owner,
@@ -44,6 +45,7 @@ pub fn mint_tokens_for_free(ctx:Context<MintFreeTokens>,amount:u64)->Result<()>{
     let clock = Clock::get()?;
     let hxui_lite_minted_timestamp = &mut ctx.accounts.hxui_lite_minted_timestamp;
     require!(hxui_lite_minted_timestamp.last_minted_timestamp == 0 || (clock.unix_timestamp - hxui_lite_minted_timestamp.last_minted_timestamp >= 5),CustomError::RateLimitExceeded);
+    require!(hxui_lite_minted_timestamp.close_timestamp != 0,CustomError::UnregisteredFreeTokens);
 
     hxui_lite_minted_timestamp.last_minted_timestamp = clock.unix_timestamp;
     //mint the tokens, lite_authority is a signer.

@@ -34,7 +34,7 @@ pub struct VoteCandidate<'info>{
         seeds = [b"hxui_candidate",name.as_bytes()],
         bump = hxui_candidate.bump,
         constraint = hxui_candidate.is_winner == false @ CustomError::CandidateAlreadyAWinner,
-        constraint = hxui_candidate.is_votable == true @ CustomError::CandidateIsNoLongerVotable
+        constraint = hxui_candidate.can_be_winner == true @ CustomError::CandidateIsNoLongerVotable
     )]
     pub hxui_candidate:Account<'info,Candidate>,
 

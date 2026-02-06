@@ -5,5 +5,6 @@ use anchor_lang::prelude::*;
 #[derive(InitSpace)]
 pub struct FreeTokenTimestamp{
     pub last_minted_timestamp:i64,
+    pub close_timestamp:i64,
     pub bump:u8
 }
