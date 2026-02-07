@@ -9,12 +9,10 @@ pub use instructions::*;
 pub use states::*;
 pub use constants::*;
 pub use errors::*;
-declare_id!("EpF1FNjziFb8wrR1p5usVW1AbcU7saCt8deoiVY31zE7");
 
+declare_id!("EpF1FNjziFb8wrR1p5usVW1AbcU7saCt8deoiVY31zE7");
 #[program]
 pub mod hxui {
-    use crate::instruction::ClaimRegistrationFees;
-
     use super::*;
 
     pub fn initialise_dapp(ctx:Context<InitialiseDapp>,price_per_token:u64,tokens_per_vote:u64,is_claim_back_offer_live:bool,claim_basis_points:u32)->Result<()>{

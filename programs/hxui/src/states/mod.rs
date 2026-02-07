@@ -14,3 +14,5 @@ pub mod candidate_voters;
 pub use candidate_voters::*;
 
 
+pub mod free_tokens_counter;
+pub use free_tokens_counter::*;

@@ -15,6 +15,6 @@ pub struct CancelUnRegisterForFreeTokens<'info>{
 
 pub fn reset_close_time(ctx:Context<CancelUnRegisterForFreeTokens>)->Result<()>{
     let hxui_lite_minted_timestamp = &mut ctx.accounts.hxui_lite_minted_timestamp;
-    hxui_lite_minted_timestamp.close_timestamp = 0;
+    hxui_lite_minted_timestamp.closable_timestamp = 0;
     Ok(())
 }

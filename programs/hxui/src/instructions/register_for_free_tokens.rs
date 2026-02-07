@@ -1,8 +1,5 @@
 use anchor_lang::prelude::*;
 
-use anchor_spl::{
-    token_interface::{Mint,Token2022},
-};
 use crate::{ANCHOR_DISCRIMINATOR,FreeTokenTimestamp};
 #[derive(Accounts)]
 pub struct RegisterFreeTokens<'info>{

@@ -20,6 +20,7 @@ pub struct ClaimRegistration<'info>{
 pub fn close_last_minted_timestamp(ctx:Context<ClaimRegistration>)->Result<()>{
     let clock = Clock::get()?;
     let hxui_lite_minted_timestamp = &ctx.accounts.hxui_lite_minted_timestamp;
-    require!(clock.unix_timestamp >= hxui_lite_minted_timestamp.close_timestamp,CustomError::UnclaimableYet);
+    require!(hxui_lite_minted_timestamp.closable_timestamp !=0,CustomError::UnregisterFirst);
+    require!(clock.unix_timestamp >= hxui_lite_minted_timestamp.closable_timestamp,CustomError::UnclaimableYet);
     Ok(())
 }
