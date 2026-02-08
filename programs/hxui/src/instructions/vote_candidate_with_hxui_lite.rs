@@ -4,30 +4,28 @@ use anchor_spl::{
     associated_token::AssociatedToken,
     token_interface::{Mint,TokenAccount,Token2022,Burn,burn},
 };
-use crate::{Candidate, Config, CustomError,ANCHOR_DISCRIMINATOR,VoteReceipt};
+use crate::{Candidate, Config, CustomError};
 #[derive(Accounts)]
 #[instruction(name:String)]
-pub struct VoteCandidate<'info>{
-    #[account(mut)] // for now, the owner is mutable soon it will be a vault
+pub struct VoteCandidateWithHxuiLite<'info>{
     pub owner:Signer<'info>,
 
     #[account(
         mut,
         associated_token::authority = owner,
-        associated_token::mint = hxui_mint,
+        associated_token::mint = hxui_lite_mint,
         associated_token::token_program = token_program
     )]
-    pub hxui_token_account:InterfaceAccount<'info,TokenAccount>,
+    pub hxui_lite_token_account:InterfaceAccount<'info,TokenAccount>,
 
-     #[account(
+    #[account(
         mut,
-        seeds = [b"hxui_mint"],
+        seeds = [b"hxui_lite_mint"],
         bump,
         mint::decimals = 0,
-        mint::authority = hxui_mint,
-        mint::token_program = token_program
+        mint::token_program = token_program,
     )]
-    pub hxui_mint:InterfaceAccount<'info,Mint>,
+    pub hxui_lite_mint:InterfaceAccount<'info,Mint>,
 
     #[account(
         mut,
@@ -38,15 +36,6 @@ pub struct VoteCandidate<'info>{
     )]
     pub hxui_candidate:Account<'info,Candidate>,
 
-    
-    #[account(
-        init_if_needed,
-        payer = owner,
-        space = ANCHOR_DISCRIMINATOR + VoteReceipt::INIT_SPACE,
-        seeds = [b"vote_receipt",hxui_candidate.id.to_le_bytes().as_ref(),owner.key().as_ref()],
-        bump,
-    )]
-    pub vote_receipt:Account<'info,VoteReceipt>,
 
     #[account(
         seeds = [b"hxui_config"],
@@ -59,25 +48,17 @@ pub struct VoteCandidate<'info>{
     pub token_program:Program<'info,Token2022>,
 }
 
-pub fn vote(ctx:Context<VoteCandidate>,votes:u64)->Result<()>{
+pub fn vote_with_hxui_lite(ctx:Context<VoteCandidateWithHxuiLite>,votes:u64)->Result<()>{
     let candidate = &mut ctx.accounts.hxui_candidate;
-    let vote_receipt = &mut ctx.accounts.vote_receipt;
     let config = & ctx.accounts.hxui_config;
-    if vote_receipt.tokens == 0{
-        candidate.total_pro_voters +=1;
-        vote_receipt.bump = ctx.bumps.vote_receipt;
-        vote_receipt.id = candidate.id;
-    }
 
     let tokens_spent = votes * config.tokens_per_vote;
-    vote_receipt.tokens += tokens_spent;
-    
     candidate.number_of_votes += votes;
     let cpi_context = CpiContext::new(ctx.accounts.token_program.to_account_info(),Burn{
-        mint:ctx.accounts.hxui_mint.to_account_info(),
-        from:ctx.accounts.hxui_token_account.to_account_info(),
+        mint:ctx.accounts.hxui_lite_mint.to_account_info(),
+        from:ctx.accounts.hxui_lite_token_account.to_account_info(),
         authority:ctx.accounts.owner.to_account_info()
     });
 
-    burn(cpi_context,tokens_spent )
+    burn(cpi_context,tokens_spent)
 }

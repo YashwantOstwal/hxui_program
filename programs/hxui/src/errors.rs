@@ -32,7 +32,7 @@ pub enum CustomError {
     #[msg("The candidate is already a winner.")]
     CandidateAlreadyAWinner,
 
-    #[msg("The candidate is no longer votable.")]
+    #[msg("Candidate is already withdrawn or is a winner.")]
     CandidateIsNoLongerVotable,
 
     #[msg("The registration fees can be claimed only after 12 hours of unregistration.")]
@@ -57,5 +57,8 @@ pub enum CustomError {
     InvalidCandidate,
 
     #[msg("Not all candidates have been passed.")]
-    MissingCandidate
+    MissingCandidate,
+
+    #[msg("There are no candidates to pick winner from.")]
+    NoCandidates
 }

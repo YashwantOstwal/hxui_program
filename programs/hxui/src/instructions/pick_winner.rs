@@ -29,23 +29,28 @@ pub fn pick_winner<'info>(ctx:Context<'_, '_, 'info, 'info,PickWinner<'_>>)->Res
     require!(!poll.current_poll_winner_drawn,CustomError::WinnerForCurrentPollAlreadyDrawn);
 
     let mut missing_candidates = poll.current_poll_candidates.clone();
+    require!(!missing_candidates.is_empty(),CustomError::NoCandidates);
+    let total_candidates = missing_candidates.len();
     let mut candidates= Vec::new();
     
-    let remaining_accounts: &[AccountInfo<'info>] = ctx.remaining_accounts;
-    for account_info in remaining_accounts{
+
+    for account_info in ctx.remaining_accounts{
         let candidate:Account<Candidate> = Account::try_from(account_info)?;
+
        match missing_candidates.iter().position(|&x| x == candidate.id){
         Some(index)=>{
             missing_candidates.remove(index);
             candidates.push(candidate);
         },
         None=>{
-            require!(false,CustomError::InvalidCandidate);
+            return err!(CustomError::InvalidCandidate)
         }
     }
 }
-    require!(missing_candidates.len() == 0,CustomError::MissingCandidate);
+    require!(missing_candidates.is_empty(),CustomError::MissingCandidate);
+    require!(candidates.len() == total_candidates,CustomError::AllFreeTokensForTheDayMinted);
     let mut winner_index = 0;
+
     for i in 1..candidates.len(){
         if candidates[i].number_of_votes > candidates[winner_index].number_of_votes || 
         (candidates[i].number_of_votes == candidates[winner_index].number_of_votes && 
@@ -56,6 +61,7 @@ pub fn pick_winner<'info>(ctx:Context<'_, '_, 'info, 'info,PickWinner<'_>>)->Res
     }
     candidates[winner_index].is_winner = true;
     candidates[winner_index].can_be_winner = false;
+    candidates[winner_index].exit(ctx.program_id)?;
     
     if let Some(index) = poll.current_poll_candidates.iter().position(|&x| x == candidates[winner_index].id){
         poll.current_poll_candidates.remove(index);

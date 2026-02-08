@@ -14,6 +14,7 @@ import {
   Keypair,
   LAMPORTS_PER_SOL,
   Transaction,
+  TransactionInstruction,
 } from "@solana/web3.js";
 import assert from "assert";
 const { BN } = anchor;
@@ -116,8 +117,9 @@ const MINTED_TIMESTAMP_ACCOUNT_SPACE = 25;
 // const cANDIDATE__ACCOUNT_SPACE;
 
 const COOLDOWN = 2;
-const FREE_TOKENS_PER_EPOCH = 2;
-const CANDIDATE_ACCOUNT_SPACE = 8 + 331;
+const FREE_TOKENS_PER_EPOCH = 20;
+const CANDIDATE_ACCOUNT_SPACE = 8 + 354;
+const FREE_TOKENS_MINT_AMOUNT = 4;
 const DEFAULT_CLAIMABLE_BASIS_POINTS = 5000;
 let user1 = new Keypair();
 let user1Balance = 0;
@@ -159,6 +161,10 @@ async function airdropAndAssert(
 
   assert.equal(userBalanceAfter, userBalanceBefore + lamports);
 }
+const [pollAddress, pollBump] = PublicKey.findProgramAddressSync(
+  [Buffer.from("hxui_poll")],
+  program.programId,
+);
 
 describe("1) initialise_dapp instruction testing", () => {
   it("1.1) Inits the config account!", async () => {
@@ -272,10 +278,6 @@ describe("1) initialise_dapp instruction testing", () => {
 });
 
 describe("2) create_poll instruction testing", () => {
-  const [pollAddress, pollBump] = PublicKey.findProgramAddressSync(
-    [Buffer.from("hxui_poll")],
-    program.programId,
-  );
   it("2.1) Create Genesis poll", async () => {
     const currentBlockTime = await getBlockTime();
     const pollEndsAt = new BN(currentBlockTime + 3);
@@ -804,23 +806,94 @@ describe("5) Candidate Instruction testing", () => {
     [Buffer.from("hxui_candidate"), Buffer.from(candidate1Name)],
     program.programId,
   );
-  const candidate1Description =
-    "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in volu..";
-  before(() => {
-    assert(candidate1Name.length <= 32);
-    assert(candidate1Description.length <= 280);
+  const candidates: {
+    name: string;
+    description: string;
+    address: PublicKey;
+    bump: number;
+  }[] = [
+    {
+      name: candidate1Name,
+      description:
+        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in volu.",
+      address: candidate1Address,
+      bump: candidate1Bump,
+    },
+  ];
+
+  const users: Keypair[] = [];
+  const creationIxns: TransactionInstruction[] = [];
+  for (let i = 0; i < 3; i++) {
+    const user = new Keypair();
+    const [userTokenCreationIxn] = getAssociatedTokenAccountForHxuiLiteIxn(
+      user.publicKey,
+    );
+    creationIxns.push(userTokenCreationIxn);
+    users.push(user);
+  }
+
+  before(async () => {
+    assert(candidates[0].name.length <= 32);
+    assert(candidates[0].description.length <= 280);
+    for (let i = 0; i < 3; i++) {
+      await airdropAndAssert(users[i].publicKey, 0.01 * LAMPORTS_PER_SOL);
+    }
+    const tx = new Transaction().add(...creationIxns);
+    await provider.sendAndConfirm(tx, users);
+
+    await sleep(0.2);
+    for (let i = 0; i < 3; i++) {
+      const tokenAccount = await getAccount(
+        connection,
+        getAssociatedTokenAddressOfHxuiLite(users[i].publicKey),
+        "confirmed",
+        TOKEN_2022_PROGRAM_ID,
+      );
+      assert(tokenAccount.mint.equals(hxuiLiteMintAddress));
+      assert(
+        tokenAccount.address.equals(
+          getAssociatedTokenAddressOfHxuiLite(users[i].publicKey),
+        ),
+      );
+      assert(tokenAccount.owner.equals(users[i].publicKey));
+    }
+
+    const newTx = new Transaction();
+    for (let i = 0; i < 3; i++) {
+      const registerIxn = await program.methods
+        .registerForFreeTokens()
+        .accounts({
+          owner: users[i].publicKey,
+        })
+        .instruction();
+      const mintIxn = await program.methods
+        .mintFreeTokens()
+        .accounts({
+          owner: users[i].publicKey,
+          liteAuthority: liteAuthority.publicKey,
+        })
+        .instruction();
+      newTx.add(registerIxn, mintIxn);
+    }
+    await provider.sendAndConfirm(newTx, [...users, liteAuthority]);
   });
 
-  it("Create a candidate", async () => {
+  it("5.1) Create a candidate", async () => {
     const adminBalanceBefore = await getBalance(adminPubkey);
+    const pollAccountBefore = await program.account.poll.fetch(pollAddress);
     await program.methods
-      .createCandidate(candidate1Name, candidate1Description, false, null)
+      .createCandidate(
+        candidates[0].name,
+        candidates[0].description,
+        false,
+        null,
+      )
       .accounts({ admin: adminPubkey })
       .signers([admin])
       .rpc();
     const adminBalanceAfter = await getBalance(adminPubkey);
 
-    const candidate1AccountBalance = await getBalance(candidate1Address);
+    const candidate1AccountBalance = await getBalance(candidates[0].address);
     const expectedCandidate1AccountBalance = await getRent(
       CANDIDATE_ACCOUNT_SPACE,
     );
@@ -830,11 +903,13 @@ describe("5) Candidate Instruction testing", () => {
       candidate1AccountBalance,
     );
     const candidate1Account = await program.account.candidate.fetch(
-      candidate1Address,
+      candidates[0].address,
     );
 
-    assert.equal(candidate1Account.name, candidate1Name);
-    assert.equal(candidate1Account.description, candidate1Description);
+    const pollAccountAfter = await program.account.poll.fetch(pollAddress);
+
+    assert.equal(candidate1Account.name, candidates[0].name);
+    assert.equal(candidate1Account.description, candidates[0].description);
     assert.equal(candidate1Account.isWinner, false);
     assert.equal(candidate1Account.canBeWinner, true);
     assert.equal(
@@ -842,8 +917,211 @@ describe("5) Candidate Instruction testing", () => {
       DEFAULT_CLAIMABLE_BASIS_POINTS,
     );
     assert.equal(candidate1Account.claimableIfWinner, false);
-    assert.equal(candidate1Account.bump, candidate1Bump);
+    assert.equal(candidate1Account.bump, candidates[0].bump);
+    assert.equal(candidate1Account.claimWindow, 0);
+    assert.equal(candidate1Account.numberOfVotes, 0);
+    assert.equal(candidate1Account.id, pollAccountBefore.totalCandidates);
+
+    // poll account state update.
+    assert.equal(
+      pollAccountAfter.totalCandidates - pollAccountBefore.totalCandidates,
+      1,
+    );
+    assert.equal(
+      pollAccountAfter.currentPollCandidates.length -
+        pollAccountBefore.currentPollCandidates.length,
+      1,
+    );
+    assert(
+      pollAccountAfter.currentPollCandidates.includes(candidate1Account.id),
+    );
   });
+  it("5.2) users[0] voting 1 vote to candidates[0] with hxui lite tokens", async () => {
+    const votes = 1;
+    const candidateAccountBefore = await program.account.candidate.fetch(
+      candidates[0].address,
+    );
+    const tokenAccountStateBefore = await getAccount(
+      connection,
+      getAssociatedTokenAddressOfHxuiLite(users[0].publicKey),
+      "confirmed",
+      TOKEN_2022_PROGRAM_ID,
+    );
+    await program.methods
+      .voteCandidateWithHxuiLite(candidates[0].name, new BN(votes))
+      .accounts({ owner: users[0].publicKey })
+      .signers([users[0]])
+      .rpc();
+    const candidateAccountAfter = await program.account.candidate.fetch(
+      candidates[0].address,
+    );
+    assert(
+      candidateAccountAfter.numberOfVotes
+        .sub(candidateAccountBefore.numberOfVotes)
+        .eq(new BN(votes)),
+    );
+
+    await sleep(0.2);
+    const tokenAccountStateAfter = await getAccount(
+      connection,
+      getAssociatedTokenAddressOfHxuiLite(users[0].publicKey),
+      "confirmed",
+      TOKEN_2022_PROGRAM_ID,
+    );
+
+    const config = await program.account.config.fetch(hxuiConfigAddress);
+    assert(
+      new BN(tokenAccountStateBefore.amount - tokenAccountStateAfter.amount).eq(
+        config.tokensPerVote.mul(new BN(votes)),
+      ),
+    );
+  });
+  it("5.3) Creating another candidate", async () => {
+    const newCandidateName = "Privy as Solana wallet adapter";
+    const newCandidateDescription = candidates[0].description;
+    await program.methods
+      .createCandidate(newCandidateName, newCandidateDescription, false, null)
+      .accounts({ admin: adminPubkey })
+      .signers([admin])
+      .rpc();
+    const [newCandidateAddress, newCandidateBump] =
+      PublicKey.findProgramAddressSync(
+        [Buffer.from("hxui_candidate"), Buffer.from(newCandidateName)],
+        program.programId,
+      );
+    candidates.push({
+      name: newCandidateName,
+      description: newCandidateDescription,
+      address: newCandidateAddress,
+      bump: newCandidateBump,
+    });
+  });
+  it("5.5) Picking a winner after poll has ended", async () => {
+    let expectedWinnerCandidateId: number;
+    let maxVotes: anchor.BN = new BN(0);
+    candidates.forEach(async ({ address }) => {
+      const candidate = await program.account.candidate.fetch(address);
+      // None of the candidates in the candidates[] are winners so far.
+      assert(!candidate.isWinner && candidate.canBeWinner, "a");
+      if (
+        expectedWinnerCandidateId == undefined ||
+        candidate.numberOfVotes.cmp(maxVotes) == 1 ||
+        (candidate.numberOfVotes.cmp(maxVotes) == 0 &&
+          candidate.id < expectedWinnerCandidateId)
+      ) {
+        expectedWinnerCandidateId = candidate.id;
+        maxVotes = candidate.numberOfVotes;
+      }
+    });
+
+    await program.methods
+      .drawWinner()
+      .accounts({
+        admin: adminPubkey,
+      })
+      .remainingAccounts(
+        candidates.map(({ address }) => ({
+          pubkey: address,
+          isWritable: true,
+          isSigner: false,
+        })),
+      )
+      .signers([admin])
+      .rpc();
+
+    const pollAccount = await program.account.poll.fetch(pollAddress);
+    assert.equal(pollAccount.currentPollWinnerDrawn, true, "b");
+
+    candidates.forEach(async ({ address }) => {
+      const candidate = await program.account.candidate.fetch(address);
+      if (candidate.id == expectedWinnerCandidateId) {
+        assert(candidate.isWinner && !candidate.canBeWinner, "c");
+      } else {
+        assert(!candidate.isWinner && candidate.canBeWinner, "d");
+      }
+    });
+    assert(
+      !pollAccount.currentPollCandidates.includes(expectedWinnerCandidateId),
+      "e",
+    );
+  });
+  it("5.4) Withdraw a candidate", async () => {
+    const candidateBefore = await program.account.candidate.fetch(
+      candidates[1].address,
+    );
+    assert(candidateBefore.canBeWinner && !candidateBefore.isWinner);
+    await program.methods
+      .withdrawCandidate(candidates[1].name)
+      .accounts({
+        admin: adminPubkey,
+      })
+      .signers([admin])
+      .rpc();
+
+    const candidateAfter = await program.account.candidate.fetch(
+      candidates[1].address,
+    );
+
+    assert(!candidateAfter.canBeWinner);
+
+    const pollAccount = await program.account.poll.fetch(pollAddress);
+    assert(!pollAccount.currentPollCandidates.includes(candidateAfter.id));
+  });
+
+  it("5.5) Cannot vote a Winner or a Withdrawn candidate", async () => {
+    try {
+      await program.methods
+        .voteCandidateWithHxuiLite(candidates[1].name, new BN(1))
+        .accounts({
+          owner: users[1].publicKey,
+        })
+        .signers([users[1]])
+        .rpc();
+    } catch ({
+      error: {
+        errorCode: { code },
+      },
+    }) {
+      assert.equal(code, "CandidateIsNoLongerVotable");
+    }
+
+    try {
+      await program.methods
+        .voteCandidateWithHxuiLite(candidates[0].name, new BN(1))
+        .accounts({
+          owner: users[1].publicKey,
+        })
+        .signers([users[1]])
+        .rpc();
+    } catch ({
+      error: {
+        errorCode: { code },
+      },
+    }) {
+      assert.equal(code, "CandidateAlreadyAWinner");
+    }
+  });
+
+  it("5.6) Cannot Withdraw a winner candidate", async () => {
+    try {
+      // candidates[0] is winner
+      await program.methods
+        .withdrawCandidate(candidates[0].name)
+        .accounts({ admin: adminPubkey })
+        .signers([admin])
+        .rpc();
+    } catch ({
+      error: {
+        errorCode: { code },
+      },
+    }) {
+      assert.strictEqual(code, "CandidateAlreadyAWinner");
+    }
+  });
+  it("5.5) Open a withdraw window for candidate for 2 seconds or so", () => {});
+  // it("5.6) one of the 3 voters claims it back") it is a free token.
+  it("5.6) Attempt to close the account without clearing the receipts after 2 closing of withdraw window", () => {});
+  it("5.7) Close the candidate and check the rent.");
 });
 
 // describe("5) vote_candidate instruction testing", () => {

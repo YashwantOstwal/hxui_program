@@ -71,6 +71,6 @@ pub fn mint_tokens_for_free(ctx:Context<MintFreeTokens>,amount:u64)->Result<()>{
         authority:ctx.accounts.lite_authority.to_account_info()
     });
 
-    hxui_lite_free_mints_counter.remaining_free_tokens -=1;
+    hxui_lite_free_mints_counter.remaining_free_tokens -= amount;
     mint_to(cpi_context,amount)
 }

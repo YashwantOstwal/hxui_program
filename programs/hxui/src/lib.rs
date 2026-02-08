@@ -57,7 +57,7 @@ pub fn draw_winner<'info>(ctx:Context<'_, '_, 'info, 'info,PickWinner<'_>>)->Res
     }
 
     pub fn mint_free_tokens(ctx:Context<MintFreeTokens>)->Result<()>{
-        instructions::mint_free_tokens::mint_tokens_for_free(ctx,1)
+        instructions::mint_free_tokens::mint_tokens_for_free(ctx,4)
     }
     
     pub fn create_candidate(ctx:Context<CreateCandidate>,name:String,description:String,
@@ -80,6 +80,13 @@ pub fn draw_winner<'info>(ctx:Context<'_, '_, 'info, 'info,PickWinner<'_>>)->Res
     }
     pub fn vote_candidate(ctx:Context<VoteCandidate>,_name:String,votes:u64)->Result<()>{
         instructions::vote_candidate::vote(ctx,votes)
+    }
+
+    pub fn vote_candidate_with_hxui_lite(ctx:Context<VoteCandidateWithHxuiLite>,_name:String,votes:u64)->Result<()>{
+        instructions::vote_candidate_with_hxui_lite::vote_with_hxui_lite(ctx,votes)
+    }
+    pub fn withdraw_candidate(ctx:Context<WithdrawCandidate>,_name:String)->Result<()>{
+        instructions::withdraw_candidate::stop_candidate(ctx)
     }
 
 }

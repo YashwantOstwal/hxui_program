@@ -37,5 +37,10 @@ pub use cancel_unregister_for_free_tokens::*;
 pub mod claim_registration;
 pub use claim_registration::*;
 
+pub mod vote_candidate_with_hxui_lite;
+pub use vote_candidate_with_hxui_lite::*;
+
+pub mod withdraw_candidate;
+pub use withdraw_candidate::*;
 
 
