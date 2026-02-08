@@ -47,12 +47,15 @@ pub enum CustomError {
     #[msg("Winner for current poll is already drawn.")]
     WinnerForCurrentPollAlreadyDrawn,
 
-    #[msg("Pass all the candidate.")]
-    MissingCandidate,
-
     #[msg("Please Unregister first before attempting to claim")]
     UnregisterFirst,
 
-    #[msg("All 50 free tokens minted for the day.")]
-    AllFreeTokensForTheDayMinted
+    #[msg("All 100 free tokens minted for the day.")]
+    AllFreeTokensForTheDayMinted,
+
+    #[msg("Atleast one of the candidate is not a candidate.")]
+    InvalidCandidate,
+
+    #[msg("Not all candidates have been passed.")]
+    MissingCandidate
 }

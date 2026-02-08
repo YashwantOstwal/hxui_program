@@ -16,7 +16,6 @@ pub struct Candidate{
     pub claimable_if_winner:bool,
     pub claimable_basis_points_if_winner:u16,
     pub claim_window:i64,
-    pub enrolled_at:i64,
     pub bump:u8
 
 }

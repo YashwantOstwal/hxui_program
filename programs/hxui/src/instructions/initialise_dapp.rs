@@ -5,7 +5,7 @@ use anchor_spl::{
 
 
 
-use crate::{ANCHOR_DISCRIMINATOR, Config, CustomError, FreeTokensCounter, Voter};
+use crate::{ANCHOR_DISCRIMINATOR, Config, CustomError, FREE_TOKENS_PER_EPOCH, FreeTokensCounter, Voter};
 #[derive(Accounts)]
 pub struct InitialiseDapp<'info>{
     #[account(mut)]
@@ -78,7 +78,7 @@ pub fn initialise_config(ctx:Context<InitialiseDapp>,config:Config)->Result<()>{
     let free_tokens_counter = &mut ctx.accounts.free_tokens_counter;
     free_tokens_counter.bump = ctx.bumps.free_tokens_counter;
     free_tokens_counter.current_epoch = (Clock::get()?).epoch;
-    free_tokens_counter.remaining_free_tokens = 100;
+    free_tokens_counter.remaining_free_tokens = FREE_TOKENS_PER_EPOCH;
     
     transfer(cpi_context, rent)
 }

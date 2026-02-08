@@ -68,6 +68,12 @@ const [hxuiConfigAddress, hxuiConfigBump] = PublicKey.findProgramAddressSync(
   program.programId,
 );
 
+const [hxuiFreeTokensCounterAddress, hxuiFreeTokensCounterBump] =
+  PublicKey.findProgramAddressSync(
+    [Buffer.from("hxui_free_tokens_counter")],
+    program.programId,
+  );
+
 const pricePerToken = new BN(0.001 * LAMPORTS_PER_SOL);
 const tokensPerVote = new BN(2);
 
@@ -109,7 +115,10 @@ const getBalance = async (user: PublicKey) => {
 const MINTED_TIMESTAMP_ACCOUNT_SPACE = 25;
 // const cANDIDATE__ACCOUNT_SPACE;
 
-const COOLDOWN = 4;
+const COOLDOWN = 2;
+const FREE_TOKENS_PER_EPOCH = 2;
+const CANDIDATE_ACCOUNT_SPACE = 8 + 331;
+const DEFAULT_CLAIMABLE_BASIS_POINTS = 5000;
 let user1 = new Keypair();
 let user1Balance = 0;
 function getAssociatedTokenAddressOfHxuiLite(user: PublicKey) {
@@ -148,7 +157,7 @@ async function airdropAndAssert(
   await airdrop(...args);
   const userBalanceAfter = await getBalance(userPubkey);
 
-  assert.equal(userBalanceAfter, userBalanceBefore + LAMPORTS_PER_SOL);
+  assert.equal(userBalanceAfter, userBalanceBefore + lamports);
 }
 
 describe("1) initialise_dapp instruction testing", () => {
@@ -262,107 +271,313 @@ describe("1) initialise_dapp instruction testing", () => {
   });
 });
 
-// describe("2) create_poll instruction testing", () => {
-//   const [pollAddress, pollBump] = PublicKey.findProgramAddressSync(
-//     [Buffer.from("hxui_poll")],
-//     program.programId,
-//   );
-//   it("2.1) Create Genesis poll", async () => {
-//     const currentBlockTime = await getBlockTime();
-//     const pollEndsAt = new BN(currentBlockTime + 3);
+describe("2) create_poll instruction testing", () => {
+  const [pollAddress, pollBump] = PublicKey.findProgramAddressSync(
+    [Buffer.from("hxui_poll")],
+    program.programId,
+  );
+  it("2.1) Create Genesis poll", async () => {
+    const currentBlockTime = await getBlockTime();
+    const pollEndsAt = new BN(currentBlockTime + 3);
 
-//     const adminBalanceBefore = await connection.getBalance(adminPubkey);
-//     const anchorWalletBalanceBefore = await connection.getBalance(
-//       payer.publicKey,
+    const adminBalanceBefore = await connection.getBalance(adminPubkey);
+    await program.methods
+      .createPoll(pollEndsAt)
+      .accounts({
+        admin: adminPubkey,
+      })
+      .signers([admin])
+      .rpc();
+
+    const adminBalanceAfter = await connection.getBalance(adminPubkey);
+
+    const pollRent = await getRent(getPollSize());
+    // admin paid for the poll rent.
+    assert.equal(adminBalanceAfter, adminBalanceBefore - pollRent);
+
+    const pollAccountData = await program.account.poll.fetch(pollAddress);
+    assert.equal(pollAccountData.bump, pollBump);
+    assert(pollAccountData.currentPollDeadline.eq(pollEndsAt));
+    assert.equal(pollAccountData.currentPollWinnerDrawn, false);
+    assert.equal(pollAccountData.totalCandidates, 0);
+    assert.equal(pollAccountData.currentPollCandidates.length, 0);
+  });
+  //   it("2.2) Cannot pick winner before poll ends", async () => {
+  //     try {
+  //       await program.methods
+  //         .drawWinner()
+  //         .accounts({ admin: adminPubkey })
+  //         .signers([admin])
+  //         .rpc();
+  //       assert(false);
+  //     } catch ({
+  //       error: {
+  //         errorCode: { code },
+  //       },
+  //     }) {
+  //       //error because the poll is live
+  //       assert.equal(code, "PollIsLive");
+  //     }
+  //   });
+  //   it("2.3) Cannot create a new poll before the poll ends", async () => {
+  //     const blockTime = await getBlockTime();
+  //     const deadline = new BN(blockTime + 3);
+  //     try {
+  //       await program.methods
+  //         .createPoll(deadline)
+  //         .accounts({
+  //           admin: adminPubkey,
+  //         })
+  //         .signers([admin])
+  //         .rpc();
+  //       assert(false);
+  //     } catch ({
+  //       error: {
+  //         errorCode: { code },
+  //       },
+  //     }) {
+  //       assert.equal(code, "PollIsLive");
+  //     }
+  //   });
+
+  //   it("2.4) Current Poll has ended", async () => {
+  //     await sleep(4);
+  //     const pollAccount = await program.account.poll.fetch(pollAddress);
+  //     const currentBlockTime = await getBlockTime();
+
+  //     assert(pollAccount.currentPollDeadline.toNumber() < currentBlockTime);
+  //   });
+  //   it("2.5) Cannot create a new poll even after the poll has ended but the winner is not drawn yet (drawable after the ending of poll)", async () => {
+  //     const blockTime = await getBlockTime();
+  //     const deadline = new BN(blockTime + 120);
+  //     //Should fail.
+  //     try {
+  //       await program.methods
+  //         .createPoll(deadline)
+  //         .accounts({
+  //           admin: adminPubkey,
+  //         })
+  //         .signers([admin])
+  //         .rpc();
+  //       assert(false);
+  //     } catch ({
+  //       error: {
+  //         errorCode: { code },
+  //       },
+  //     }) {
+  //       assert.equal(code, "WinnerNotDrawn");
+  //     }
+  //   });
+  //   it("2.6) Winner for current poll is drawn", async () => {
+  //     await assert.doesNotReject(
+  //       async () =>
+  //         await program.methods
+  //           .drawWinner()
+  //           .accounts({ admin: adminPubkey })
+  //           .signers([admin])
+  //           .rpc(),
+  //     );
+
+  //     const pollAccount = await program.account.poll.fetch(pollAddress);
+  //     assert.equal(pollAccount.currentPollWinnerDrawn, true);
+  //   });
+
+  //   it("2.7) A new poll can be created but failed due to deadline being smaller than the current time", async () => {
+  //     const currentBlockTime = await getBlockTime();
+  //     const deadline = new BN(currentBlockTime - 3);
+  //     try {
+  //       await program.methods
+  //         .createPoll(deadline)
+  //         .accounts({
+  //           admin: adminPubkey,
+  //         })
+  //         .signers([admin])
+  //         .rpc();
+  //       assert(false);
+  //     } catch ({
+  //       error: {
+  //         errorCode: { code },
+  //       },
+  //     }) {
+  //       assert.equal(code, "InvalidDeadline");
+  //     }
+  //   });
+
+  //   it("2.8) A new poll created.", async () => {
+  //     const currentBlockTime = await getBlockTime();
+  //     const pollEndsAt = new BN(currentBlockTime + 3);
+  //     const adminBalanceBefore = await connection.getBalance(adminPubkey);
+  //     await assert.doesNotReject(
+  //       async () =>
+  //         await program.methods
+  //           .createPoll(pollEndsAt)
+  //           .accounts({
+  //             admin: adminPubkey,
+  //           })
+  //           .signers([admin])
+  //           .rpc(),
+  //     );
+
+  //     const adminBalanceAfter = await connection.getBalance(adminPubkey);
+
+  //     // the poll is not initialised again.
+  //     assert.equal(adminBalanceAfter, adminBalanceBefore);
+
+  //     const pollAccountData = await program.account.poll.fetch(pollAddress);
+  //     assert.equal(pollAccountData.bump, pollBump);
+  //     assert(pollAccountData.currentPollDeadline.eq(pollEndsAt));
+  //     assert.equal(pollAccountData.currentPollWinnerDrawn, false);
+  //     assert.equal(pollAccountData.totalCandidates, 0);
+  //     assert.equal(pollAccountData.currentPollCandidates.length, 0);
+  //   });
+});
+
+// describe("4) Registration for minting free tokens.", async () => {
+//   const [mintedTimestampAddressForUser1, mintedTimestampBump] =
+//     PublicKey.findProgramAddressSync(
+//       [Buffer.from("minted_timestamp"), user1.publicKey.toBuffer()],
+//       program.programId,
 //     );
 
-//     // const tx =
-//     await assert.doesNotReject(
-//       async () =>
-//         await program.methods
-//           .createPoll(pollEndsAt)
-//           .accounts({
-//             admin: adminPubkey,
-//           })
-//           .signers([admin])
-//           .rpc(),
+//   const [user1TokenCreationIxn, user1TokenAddress] =
+//     getAssociatedTokenAccountForHxuiLiteIxn(user1.publicKey);
+
+//   it("4.1) Register user 1.", async () => {
+//     //associated token account does not exist
+//     await airdropAndAssert(user1.publicKey, 2 * LAMPORTS_PER_SOL);
+//     assert.equal(await connection.getAccountInfo(user1TokenAddress), null);
+
+//     const user1BalanceBefore = await getBalance(user1.publicKey);
+//     await program.methods
+//       .registerForFreeTokens()
+//       .accounts({
+//         owner: user1.publicKey,
+//       })
+//       .signers([user1])
+//       .rpc();
+
+//     const user1BalanceAfter = await getBalance(user1.publicKey);
+
+//     const mintedTimestampAccountBalance = await getBalance(
+//       mintedTimestampAddressForUser1,
 //     );
 
-//     const anchorWalletBalanceAfter = await connection.getBalance(
-//       payer.publicKey,
+//     const mintedTimestampAccountExpectedRent = await getRent(
+//       MINTED_TIMESTAMP_ACCOUNT_SPACE,
 //     );
-//     const adminBalanceAfter = await connection.getBalance(adminPubkey);
+//     assert.equal(
+//       mintedTimestampAccountBalance,
+//       mintedTimestampAccountExpectedRent,
+//     );
+//     const mintedTimestampAccountData =
+//       await program.account.freeTokenTimestamp.fetch(
+//         mintedTimestampAddressForUser1,
+//       );
 
-//     const pollRent = await getRent(getPollSize());
-//     // admin paid for the poll rent.
-//     assert.equal(adminBalanceAfter, adminBalanceBefore - pollRent);
-
-//     //gas sponsored by the payer (anchor wallet.)
-//     assert.equal(anchorWalletBalanceAfter, anchorWalletBalanceBefore - 10000);
-
-//     const pollAccountData = await program.account.poll.fetch(pollAddress);
-//     assert.equal(pollAccountData.bump, pollBump);
-//     assert(pollAccountData.currentPollDeadline.eq(pollEndsAt));
-//     assert.equal(pollAccountData.currentPollWinnerDrawn, false);
-//     assert.equal(pollAccountData.totalCandidates, 0);
-//     assert.equal(pollAccountData.currentPollCandidates.length, 0);
+//     //succesfully registered
+//     assert.equal(mintedTimestampAccountData.bump, mintedTimestampBump);
+//     assert.equal(mintedTimestampAccountData.nextMintableTimestamp, 0);
+//     assert.equal(mintedTimestampAccountData.closableTimestamp, 0);
+//     assert.equal(
+//       user1BalanceAfter,
+//       user1BalanceBefore - mintedTimestampAccountBalance,
+//     );
 //   });
-//   it("2.2) Cannot pick winner before poll ends", async () => {
+
+//   it("4.2) Attempt to Mint free tokens without lite mint authority", async () => {
 //     try {
 //       await program.methods
-//         .drawWinner()
-//         .accounts({ admin: adminPubkey })
-//         .signers([admin])
-//         .rpc();
-//       assert(false);
-//     } catch ({
-//       error: {
-//         errorCode: { code },
-//       },
-//     }) {
-//       //error because the poll is live
-//       assert.equal(code, "PollIsLive");
-//     }
-//   });
-//   it("2.3) Cannot create a new poll before the poll ends", async () => {
-//     const blockTime = await getBlockTime();
-//     const deadline = new BN(blockTime + 3);
-//     try {
-//       await program.methods
-//         .createPoll(deadline)
+//         .mintFreeTokens()
 //         .accounts({
-//           admin: adminPubkey,
+//           owner: user1.publicKey,
+//           liteAuthority: liteAuthority.publicKey,
 //         })
-//         .signers([admin])
 //         .rpc();
 //       assert(false);
-//     } catch ({
-//       error: {
-//         errorCode: { code },
-//       },
-//     }) {
-//       assert.equal(code, "PollIsLive");
+//     } catch (err) {
+//       assert(true);
 //     }
 //   });
-
-//   it("2.4) Current Poll has ended", async () => {
-//     await sleep(4);
-//     const pollAccount = await program.account.poll.fetch(pollAddress);
-//     const currentBlockTime = await getBlockTime();
-
-//     assert(pollAccount.currentPollDeadline.toNumber() < currentBlockTime);
+//   it("4.3) Attempt to Mint free token without an associated token account for user 1. FAILS", async () => {
+//     try {
+//       // must fail
+//       await program.methods
+//         .mintFreeTokens()
+//         .accounts({
+//           owner: user1.publicKey,
+//           liteAuthority: liteAuthority.publicKey,
+//         })
+//         .signers([liteAuthority])
+//         .rpc();
+//       assert(false);
+//     } catch (err) {
+//       assert(true);
+//     }
 //   });
-//   it("2.5) Cannot create a new poll even after the poll has ended but the winner is not drawn yet (drawable after the ending of poll)", async () => {
-//     const blockTime = await getBlockTime();
-//     const deadline = new BN(blockTime + 120);
+//   it("4.4) Mint free token after creating a token account for user 1. PASSES", async () => {
+//     const tx = new Transaction().add(user1TokenCreationIxn);
+
+//     try {
+//       await provider.sendAndConfirm(tx, [user1]);
+//       assert(true);
+//     } catch (err) {
+//       assert(false);
+//     }
+
+//     const user1TokenAccount = await connection.getAccountInfo(
+//       user1TokenAddress,
+//     );
+
+//     assert.notEqual(user1TokenAccount, null);
+
+//     await program.methods
+//       .mintFreeTokens()
+//       .accounts({
+//         owner: user1.publicKey,
+//         liteAuthority: liteAuthority.publicKey,
+//       })
+//       .signers([liteAuthority])
+//       .rpc();
+
+//     // owner program is token 2022.
+//     assert(user1TokenAccount.owner.equals(TOKEN_2022_PROGRAM_ID));
+
+//     await sleep(0.2);
+//     const user1TokenAccountData = await getAccount(
+//       connection,
+//       user1TokenAddress,
+//       "confirmed",
+//       TOKEN_2022_PROGRAM_ID,
+//     );
+
+//     //  User 1 is the owner
+//     assert(user1TokenAccountData.owner.equals(user1.publicKey));
+
+//     // the token balance is 0n
+//     assert.equal(user1TokenAccountData.amount, BigInt(1));
+
+//     const now = await getBlockTime();
+
+//     const mintedTimestampAccount =
+//       await program.account.freeTokenTimestamp.fetch(
+//         mintedTimestampAddressForUser1,
+//       );
+
+//     // the correct mint time (believed current time in solana network) is stored on chain.
+//     assert(
+//       mintedTimestampAccount.nextMintableTimestamp.eq(new BN(now + COOLDOWN)),
+//     );
+//   });
+//   it("4.5) Attempt to Mint free token to user 1 before cooldown(4 secs) fails.", async () => {
 //     //Should fail.
 //     try {
 //       await program.methods
-//         .createPoll(deadline)
+//         .mintFreeTokens()
 //         .accounts({
-//           admin: adminPubkey,
+//           owner: user1.publicKey,
+//           liteAuthority: liteAuthority.publicKey,
 //         })
-//         .signers([admin])
+//         .signers([liteAuthority])
 //         .rpc();
 //       assert(false);
 //     } catch ({
@@ -370,33 +585,16 @@ describe("1) initialise_dapp instruction testing", () => {
 //         errorCode: { code },
 //       },
 //     }) {
-//       assert.equal(code, "WinnerNotDrawn");
+//       assert.equal(code, "RateLimitExceeded");
 //     }
 //   });
-//   it("2.6) Winner for current poll is drawn", async () => {
-//     await assert.doesNotReject(
-//       async () =>
-//         await program.methods
-//           .drawWinner()
-//           .accounts({ admin: adminPubkey })
-//           .signers([admin])
-//           .rpc(),
-//     );
 
-//     const pollAccount = await program.account.poll.fetch(pollAddress);
-//     assert.equal(pollAccount.currentPollWinnerDrawn, true);
-//   });
-
-//   it("2.7) A new poll can be created but failed due to deadline being smaller than the current time", async () => {
-//     const currentBlockTime = await getBlockTime();
-//     const deadline = new BN(currentBlockTime - 3);
+//   it("4.6) Attempt to claim back the rent before unregistering", async () => {
 //     try {
 //       await program.methods
-//         .createPoll(deadline)
-//         .accounts({
-//           admin: adminPubkey,
-//         })
-//         .signers([admin])
+//         .claimRegistrationFees()
+//         .accounts({ owner: user1.publicKey })
+//         .signers([user1])
 //         .rpc();
 //       assert(false);
 //     } catch ({
@@ -404,359 +602,249 @@ describe("1) initialise_dapp instruction testing", () => {
 //         errorCode: { code },
 //       },
 //     }) {
-//       assert.equal(code, "InvalidDeadline");
+//       assert.equal(code, "UnregisterFirst");
 //     }
 //   });
 
-//   it("2.8) A new poll created.", async () => {
-//     const currentBlockTime = await getBlockTime();
-//     const pollEndsAt = new BN(currentBlockTime + 3);
-//     const adminBalanceBefore = await connection.getBalance(adminPubkey);
-//     await assert.doesNotReject(
-//       async () =>
-//         await program.methods
-//           .createPoll(pollEndsAt)
-//           .accounts({
-//             admin: adminPubkey,
-//           })
-//           .signers([admin])
-//           .rpc(),
+//   // it("4.5) New token can be minted to user 1 token account (2 secs passed).", async () => {
+//   //   await sleep(2);
+//   // });
+
+//   it("4.7) Trigger Unregister for user 1 before cooldown of 4 seconds", async () => {
+//     await program.methods
+//       .unregisterForFreeTokens()
+//       .accounts({
+//         owner: user1.publicKey,
+//       })
+//       .signers([user1])
+//       .rpc();
+
+//     const mintedTimestampAccount =
+//       await program.account.freeTokenTimestamp.fetch(
+//         mintedTimestampAddressForUser1,
+//       );
+
+//     assert(
+//       mintedTimestampAccount.closableTimestamp.eq(
+//         mintedTimestampAccount.nextMintableTimestamp,
+//       ),
+//     );
+//   });
+
+//   it("4.8) Attempt to mint new tokens after unregistering fails", async () => {
+//     try {
+//       await program.methods
+//         .mintFreeTokens()
+//         .accounts({
+//           owner: user1.publicKey,
+//           liteAuthority: liteAuthority.publicKey,
+//         })
+//         .signers([liteAuthority])
+//         .rpc();
+//       assert(false);
+//     } catch ({
+//       error: {
+//         errorCode: { code },
+//       },
+//     }) {
+//       assert.equal(code, "UnregisteredFreeTokens");
+//     }
+//   });
+//   it("4.9) Attempt to Claim rent after unregistering but before closable time.", async () => {
+//     //Closable time in this situation is  last minted time + cooldown.
+//     try {
+//       await program.methods
+//         .claimRegistrationFees()
+//         .accounts({ owner: user1.publicKey })
+//         .signers([user1])
+//         .rpc();
+//       assert(false);
+//     } catch ({
+//       error: {
+//         errorCode: { code },
+//       },
+//     }) {
+//       assert.equal(code, "UnclaimableYet");
+//     }
+//   });
+
+//   it("4.10) Cancel unregister", async () => {
+//     await program.methods
+//       .cancelUnregisterForFreeTokens()
+//       .accounts({ owner: user1.publicKey })
+//       .signers([user1])
+//       .rpc();
+//     const mintedTimestampAccount =
+//       await program.account.freeTokenTimestamp.fetch(
+//         mintedTimestampAddressForUser1,
+//       );
+//     assert.equal(mintedTimestampAccount.closableTimestamp, 0);
+//   });
+
+//   it("4.11) Mint free tokens to user 1 token account after cooldown", async () => {
+//     await sleep(COOLDOWN);
+
+//     const user1TokenAccountDataBefore = await getAccount(
+//       connection,
+//       user1TokenAddress,
+//       "confirmed",
+//       TOKEN_2022_PROGRAM_ID,
 //     );
 
-//     const adminBalanceAfter = await connection.getBalance(adminPubkey);
+//     await program.methods
+//       .mintFreeTokens()
+//       .accounts({
+//         owner: user1.publicKey,
+//         liteAuthority: liteAuthority.publicKey,
+//       })
+//       .signers([liteAuthority])
+//       .rpc();
 
-//     // the poll is not initialised again.
-//     assert.equal(adminBalanceAfter, adminBalanceBefore);
+//     await sleep(0.2);
+//     const user1TokenAccountDataAfter = await getAccount(
+//       connection,
+//       user1TokenAddress,
+//       "confirmed",
+//       TOKEN_2022_PROGRAM_ID,
+//     );
 
-//     const pollAccountData = await program.account.poll.fetch(pollAddress);
-//     assert.equal(pollAccountData.bump, pollBump);
-//     assert(pollAccountData.currentPollDeadline.eq(pollEndsAt));
-//     assert.equal(pollAccountData.currentPollWinnerDrawn, false);
-//     assert.equal(pollAccountData.totalCandidates, 0);
-//     assert.equal(pollAccountData.currentPollCandidates.length, 0);
+//     // the token balance is 0n
+//     assert.equal(
+//       user1TokenAccountDataAfter.amount - user1TokenAccountDataBefore.amount,
+//       BigInt(1),
+//     );
+
+//     const now = await getBlockTime();
+
+//     const mintedTimestampAccount =
+//       await program.account.freeTokenTimestamp.fetch(
+//         mintedTimestampAddressForUser1,
+//       );
+
+//     // the correct mint time (believed current time in solana network) is stored on chain.
+//     assert(
+//       mintedTimestampAccount.nextMintableTimestamp.eq(new BN(now + COOLDOWN)),
+//     );
+//   });
+
+//   it("4.12) Unregister after cooldown allows to claim registration fees immediately", async () => {
+//     await sleep(COOLDOWN);
+//     const unregistrationIxn = await program.methods
+//       .unregisterForFreeTokens()
+//       .accounts({ owner: user1.publicKey })
+//       .instruction();
+//     const claimRegistrationFeesIxn = await program.methods
+//       .claimRegistrationFees()
+//       .accounts({ owner: user1.publicKey })
+//       .instruction();
+
+//     const tx = new Transaction().add(
+//       unregistrationIxn,
+//       claimRegistrationFeesIxn,
+//     );
+//     const user1BalanceBefore = await getBalance(user1.publicKey);
+//     await provider.sendAndConfirm(tx, [user1]);
+//     const user1BalanceAfter = await getBalance(user1.publicKey);
+
+//     const claimedRent = await getRent(MINTED_TIMESTAMP_ACCOUNT_SPACE);
+//     assert.equal(user1BalanceAfter, user1BalanceBefore + claimedRent);
+//   });
+//   it("4.13) Attempt to mint more free tokens than can be minted per epoch", async () => {
+//     //register for 2 more users and reregister for user1
+//     const freeTokensCounter = await program.account.freeTokensCounter.fetch(
+//       hxuiFreeTokensCounterAddress,
+//     );
+//     const users: Keypair[] = [];
+//     const buffer = Math.floor(Math.random() * 3);
+//     // attempt to mint for one + buffer more than the remaining tokens.
+//     for (let i = 0; i <= freeTokensCounter.remainingFreeTokens + buffer; i++) {
+//       const user = new Keypair();
+//       users.push(user);
+//       await airdropAndAssert(user.publicKey, 0.1 * LAMPORTS_PER_SOL);
+//       const registrationIxn = await program.methods
+//         .registerForFreeTokens()
+//         .accounts({ owner: user.publicKey })
+//         .instruction();
+//       const [userTokenCreationIxn, userTokenAddress] =
+//         getAssociatedTokenAccountForHxuiLiteIxn(user.publicKey);
+//       const tx = new Transaction().add(userTokenCreationIxn, registrationIxn);
+//       await provider.sendAndConfirm(tx, [user]);
+//       try {
+//         await program.methods
+//           .mintFreeTokens()
+//           .accounts({
+//             owner: user.publicKey,
+//             liteAuthority: liteAuthority.publicKey,
+//           })
+//           .signers([liteAuthority])
+//           .rpc();
+//         assert(i < freeTokensCounter.remainingFreeTokens);
+//         const {
+//           value: { uiAmount: userTokenBalance },
+//         } = await connection.getTokenAccountBalance(userTokenAddress);
+//         assert.equal(userTokenBalance, 1);
+//       } catch ({
+//         error: {
+//           errorCode: { code },
+//         },
+//       }) {
+//         assert.equal(code, "AllFreeTokensForTheDayMinted");
+//         // minting will fail for x+1 user onwards if x are the tokens that can be minted.
+//         assert(i >= freeTokensCounter.remainingFreeTokens);
+//       }
+//     }
+
+//     it("4.14) tokens that can minted for free renews after an epoch");
 //   });
 // });
 
-describe("4) Registration for minting free tokens.", async () => {
-  const [mintedTimestampAddressForUser1, mintedTimestampBump] =
-    PublicKey.findProgramAddressSync(
-      [Buffer.from("minted_timestamp"), user1.publicKey.toBuffer()],
-      program.programId,
-    );
+describe("5) Candidate Instruction testing", () => {
+  const candidate1Name = "Lorem ipsum dolor sit amet, 4321";
+  const [candidate1Address, candidate1Bump] = PublicKey.findProgramAddressSync(
+    [Buffer.from("hxui_candidate"), Buffer.from(candidate1Name)],
+    program.programId,
+  );
+  const candidate1Description =
+    "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in volu..";
+  before(() => {
+    assert(candidate1Name.length <= 32);
+    assert(candidate1Description.length <= 280);
+  });
 
-  const [user1TokenCreationIxn, user1TokenAddress] =
-    getAssociatedTokenAccountForHxuiLiteIxn(user1.publicKey);
-
-  it("4.1) Register user 1.", async () => {
-    //associated token account does not exist
-    await airdropAndAssert(user1.publicKey, LAMPORTS_PER_SOL);
-    assert.equal(await connection.getAccountInfo(user1TokenAddress), null);
-
-    const user1BalanceBefore = await getBalance(user1.publicKey);
+  it("Create a candidate", async () => {
+    const adminBalanceBefore = await getBalance(adminPubkey);
     await program.methods
-      .registerForFreeTokens()
-      .accounts({
-        owner: user1.publicKey,
-      })
-      .signers([user1])
+      .createCandidate(candidate1Name, candidate1Description, false, null)
+      .accounts({ admin: adminPubkey })
+      .signers([admin])
       .rpc();
+    const adminBalanceAfter = await getBalance(adminPubkey);
 
-    const user1BalanceAfter = await getBalance(user1.publicKey);
-
-    const mintedTimestampAccountBalance = await getBalance(
-      mintedTimestampAddressForUser1,
+    const candidate1AccountBalance = await getBalance(candidate1Address);
+    const expectedCandidate1AccountBalance = await getRent(
+      CANDIDATE_ACCOUNT_SPACE,
     );
-
-    const mintedTimestampAccountExpectedRent = await getRent(
-      MINTED_TIMESTAMP_ACCOUNT_SPACE,
-    );
+    assert.equal(candidate1AccountBalance, expectedCandidate1AccountBalance);
     assert.equal(
-      mintedTimestampAccountBalance,
-      mintedTimestampAccountExpectedRent,
+      adminBalanceBefore - adminBalanceAfter,
+      candidate1AccountBalance,
     );
-    const mintedTimestampAccountData =
-      await program.account.freeTokenTimestamp.fetch(
-        mintedTimestampAddressForUser1,
-      );
+    const candidate1Account = await program.account.candidate.fetch(
+      candidate1Address,
+    );
 
-    //succesfully registered
-    assert.equal(mintedTimestampAccountData.bump, mintedTimestampBump);
-    assert.equal(mintedTimestampAccountData.nextMintableTimestamp, 0);
-    assert.equal(mintedTimestampAccountData.closableTimestamp, 0);
+    assert.equal(candidate1Account.name, candidate1Name);
+    assert.equal(candidate1Account.description, candidate1Description);
+    assert.equal(candidate1Account.isWinner, false);
+    assert.equal(candidate1Account.canBeWinner, true);
     assert.equal(
-      user1BalanceAfter,
-      user1BalanceBefore - mintedTimestampAccountBalance,
+      candidate1Account.claimableBasisPointsIfWinner,
+      DEFAULT_CLAIMABLE_BASIS_POINTS,
     );
-  });
-
-  it("4.2) Attempt to Mint free tokens without lite mint authority", async () => {
-    try {
-      await program.methods
-        .mintFreeTokens()
-        .accounts({
-          owner: user1.publicKey,
-          liteAuthority: liteAuthority.publicKey,
-        })
-        .rpc();
-      assert(false);
-    } catch (err) {
-      assert(true);
-    }
-  });
-  it("4.3) Attempt to Mint free token without an associated token account for user 1. FAILS", async () => {
-    try {
-      // must fail
-      await program.methods
-        .mintFreeTokens()
-        .accounts({
-          owner: user1.publicKey,
-          liteAuthority: liteAuthority.publicKey,
-        })
-        .signers([liteAuthority])
-        .rpc();
-      assert(false);
-    } catch (err) {
-      assert(true);
-    }
-  });
-  it("4.4) Mint free token after creating a token account for user 1. PASSES", async () => {
-    const tx = new Transaction().add(user1TokenCreationIxn);
-
-    try {
-      await provider.sendAndConfirm(tx, [user1]);
-      assert(true);
-    } catch (err) {
-      assert(false);
-    }
-
-    const user1TokenAccount = await connection.getAccountInfo(
-      user1TokenAddress,
-    );
-
-    assert.notEqual(user1TokenAccount, null);
-
-    await program.methods
-      .mintFreeTokens()
-      .accounts({
-        owner: user1.publicKey,
-        liteAuthority: liteAuthority.publicKey,
-      })
-      .signers([liteAuthority])
-      .rpc();
-
-    // owner program is token 2022.
-    assert(user1TokenAccount.owner.equals(TOKEN_2022_PROGRAM_ID));
-
-    await sleep(0.2);
-    const user1TokenAccountData = await getAccount(
-      connection,
-      user1TokenAddress,
-      "confirmed",
-      TOKEN_2022_PROGRAM_ID,
-    );
-
-    //  User 1 is the owner
-    assert(user1TokenAccountData.owner.equals(user1.publicKey));
-
-    // the token balance is 0n
-    assert.equal(user1TokenAccountData.amount, BigInt(1));
-
-    const now = await getBlockTime();
-
-    const mintedTimestampAccount =
-      await program.account.freeTokenTimestamp.fetch(
-        mintedTimestampAddressForUser1,
-      );
-
-    // the correct mint time (believed current time in solana network) is stored on chain.
-    assert(
-      mintedTimestampAccount.nextMintableTimestamp.eq(new BN(now + COOLDOWN)),
-    );
-  });
-  it("4.5) Attempt to Mint free token to user 1 before cooldown(4 secs) fails.", async () => {
-    //Should fail.
-    try {
-      await program.methods
-        .mintFreeTokens()
-        .accounts({
-          owner: user1.publicKey,
-          liteAuthority: liteAuthority.publicKey,
-        })
-        .signers([liteAuthority])
-        .rpc();
-      assert(false);
-    } catch ({
-      error: {
-        errorCode: { code },
-      },
-    }) {
-      assert.equal(code, "RateLimitExceeded");
-    }
-  });
-
-  it("4.6) Attempt to claim back the rent before unregistering", async () => {
-    try {
-      await program.methods
-        .claimRegistrationFees()
-        .accounts({ owner: user1.publicKey })
-        .signers([user1])
-        .rpc();
-      assert(false);
-    } catch ({
-      error: {
-        errorCode: { code },
-      },
-    }) {
-      assert.equal(code, "UnregisterFirst");
-    }
-  });
-
-  // it("4.5) New token can be minted to user 1 token account (2 secs passed).", async () => {
-  //   await sleep(2);
-  // });
-
-  it("4.7) Trigger Unregister for user 1 before cooldown of 4 seconds", async () => {
-    await program.methods
-      .unregisterForFreeTokens()
-      .accounts({
-        owner: user1.publicKey,
-      })
-      .signers([user1])
-      .rpc();
-
-    const mintedTimestampAccount =
-      await program.account.freeTokenTimestamp.fetch(
-        mintedTimestampAddressForUser1,
-      );
-
-    assert(
-      mintedTimestampAccount.closableTimestamp.eq(
-        mintedTimestampAccount.nextMintableTimestamp,
-      ),
-    );
-  });
-
-  it("4.8) Attempt to mint new tokens after unregistering fails", async () => {
-    try {
-      await program.methods
-        .mintFreeTokens()
-        .accounts({
-          owner: user1.publicKey,
-          liteAuthority: liteAuthority.publicKey,
-        })
-        .signers([liteAuthority])
-        .rpc();
-      assert(false);
-    } catch ({
-      error: {
-        errorCode: { code },
-      },
-    }) {
-      assert.equal(code, "UnregisteredFreeTokens");
-    }
-  });
-  it("4.9) Attempt to Claim rent after unregistering but before closable time.", async () => {
-    //Closable time in this situation is  last minted time + cooldown.
-    try {
-      await program.methods
-        .claimRegistrationFees()
-        .accounts({ owner: user1.publicKey })
-        .signers([user1])
-        .rpc();
-      assert(false);
-    } catch ({
-      error: {
-        errorCode: { code },
-      },
-    }) {
-      assert.equal(code, "UnclaimableYet");
-    }
-  });
-
-  it("4.10) Cancel unregister", async () => {
-    await program.methods
-      .cancelUnregisterForFreeTokens()
-      .accounts({ owner: user1.publicKey })
-      .signers([user1])
-      .rpc();
-    const mintedTimestampAccount =
-      await program.account.freeTokenTimestamp.fetch(
-        mintedTimestampAddressForUser1,
-      );
-    assert.equal(mintedTimestampAccount.closableTimestamp, 0);
-  });
-
-  it("4.11) Mint free tokens to user 1 token account after cooldown", async () => {
-    await sleep(COOLDOWN);
-
-    const user1TokenAccountDataBefore = await getAccount(
-      connection,
-      user1TokenAddress,
-      "confirmed",
-      TOKEN_2022_PROGRAM_ID,
-    );
-
-    await program.methods
-      .mintFreeTokens()
-      .accounts({
-        owner: user1.publicKey,
-        liteAuthority: liteAuthority.publicKey,
-      })
-      .signers([liteAuthority])
-      .rpc();
-
-    await sleep(0.2);
-    const user1TokenAccountDataAfter = await getAccount(
-      connection,
-      user1TokenAddress,
-      "confirmed",
-      TOKEN_2022_PROGRAM_ID,
-    );
-
-    // the token balance is 0n
-    assert.equal(
-      user1TokenAccountDataAfter.amount - user1TokenAccountDataBefore.amount,
-      BigInt(1),
-    );
-
-    const now = await getBlockTime();
-
-    const mintedTimestampAccount =
-      await program.account.freeTokenTimestamp.fetch(
-        mintedTimestampAddressForUser1,
-      );
-
-    // the correct mint time (believed current time in solana network) is stored on chain.
-    assert(
-      mintedTimestampAccount.nextMintableTimestamp.eq(new BN(now + COOLDOWN)),
-    );
-  });
-
-  it("4.12) Unregister after cooldown allows to claim registration fees immediately", async () => {
-    await sleep(COOLDOWN);
-    const unregistrationIxn = await program.methods
-      .unregisterForFreeTokens()
-      .accounts({ owner: user1.publicKey })
-      .instruction();
-    const claimRegistrationFeesIxn = await program.methods
-      .claimRegistrationFees()
-      .accounts({ owner: user1.publicKey })
-      .instruction();
-
-    const tx = new Transaction().add(
-      unregistrationIxn,
-      claimRegistrationFeesIxn,
-    );
-    const user1BalanceBefore = await getBalance(user1.publicKey);
-    await provider.sendAndConfirm(tx, [user1]);
-    const user1BalanceAfter = await getBalance(user1.publicKey);
-
-    const claimedRent = await getRent(MINTED_TIMESTAMP_ACCOUNT_SPACE);
-    assert.equal(user1BalanceAfter, user1BalanceBefore + claimedRent);
+    assert.equal(candidate1Account.claimableIfWinner, false);
+    assert.equal(candidate1Account.bump, candidate1Bump);
   });
 });
-
-// dedicated buy_tokens ixn testing.
 
 // describe("5) vote_candidate instruction testing", () => {
 //   const name = "Lorem ipsum dolor sit amet, 4321";

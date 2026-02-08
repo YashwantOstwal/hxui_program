@@ -36,8 +36,8 @@ pub mod hxui {
         instructions::create_poll::create_new_poll(ctx, poll_deadline)
     }
 
-    pub fn draw_winner(ctx:Context<PickWinner>)->Result<()>{
-        instructions::pick_winner::pick_winner(ctx)
+pub fn draw_winner<'info>(ctx:Context<'_, '_, 'info, 'info,PickWinner<'_>>)->Result<()>{
+            instructions::pick_winner::pick_winner(ctx)
     }
 
     pub fn register_for_free_tokens(ctx:Context<RegisterFreeTokens>)->Result<()>{

@@ -4,7 +4,7 @@ use anchor_spl::{
     associated_token::AssociatedToken,  token_interface::{Mint, MintTo, Token2022, TokenAccount, mint_to}
 
 };
-use crate::{COOLDOWN, CustomError, FreeTokenTimestamp,FreeTokensCounter};
+use crate::{COOLDOWN, CustomError, FREE_TOKENS_PER_EPOCH, FreeTokenTimestamp, FreeTokensCounter};
 #[derive(Accounts)]
 
 pub struct MintFreeTokens<'info>{
@@ -58,7 +58,7 @@ pub fn mint_tokens_for_free(ctx:Context<MintFreeTokens>,amount:u64)->Result<()>{
     
     if is_new_epoch {
         hxui_lite_free_mints_counter.current_epoch =  current_epoch;
-        hxui_lite_free_mints_counter.remaining_free_tokens = 100;
+        hxui_lite_free_mints_counter.remaining_free_tokens = FREE_TOKENS_PER_EPOCH;
     }
     let hxui_lite_minted_timestamp = &mut ctx.accounts.hxui_lite_minted_timestamp;
     require!(hxui_lite_minted_timestamp.closable_timestamp == 0,CustomError::UnregisteredFreeTokens);
