@@ -45,8 +45,9 @@ pub struct ClaimTokens<'info>{
     #[account(
         mut,
         close = hxui_vault,
-        seeds = [b"vote_receipt",hxui_candidate.id.to_le_bytes().as_ref(),owner.key().as_ref()],
-        bump,
+        seeds = [b"vote_receipt",name.as_bytes(),owner.key().as_ref()],
+        bump = vote_receipt.bump,
+
     )]
     pub vote_receipt:Account<'info,VoteReceipt>,
     pub token_program:Program<'info,Token2022>,

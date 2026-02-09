@@ -100,4 +100,8 @@ pub fn draw_winner<'info>(ctx:Context<'_, '_, 'info, 'info,PickWinner<'_>>)->Res
         instructions::claim_tokens::claim_back_tokens(ctx)
     }
 
+    pub fn close_receipt(ctx:Context<CloseReceipt>,_name:String)->Result<()>{
+        instructions::close_receipt::close_receipt_account(ctx)
+    }
+
 }

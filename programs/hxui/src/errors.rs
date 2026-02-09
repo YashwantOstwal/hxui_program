@@ -65,7 +65,7 @@ pub enum CustomError {
     #[msg("Close all the receipts first otherwise you will lose your money.")]
     CloseAllReceiptAccount,
 
-    #[msg("Cannot close active componenet. Withdraw or wait until it becomes a winner")]
+    #[msg("Cannot close active componenet or their receipts. Withdraw or wait until it becomes a winner")]
     ActiveCandidateCannotBeClosed,
 
     #[msg("The component is either claimable or withdrawn")]
@@ -78,5 +78,8 @@ pub enum CustomError {
     TokensCannotBeClaimed,
 
     #[msg("Close time should be greater than the current time.")]
-    InvalidClosetime
+    InvalidClosetime,
+
+    #[msg("Mismatch in candidate and its receipt.")]
+    InvalidReceiptForCandidate
 }

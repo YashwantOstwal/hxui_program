@@ -43,7 +43,7 @@ pub struct VoteCandidate<'info>{
         init_if_needed,
         payer = owner,
         space = ANCHOR_DISCRIMINATOR + VoteReceipt::INIT_SPACE,
-        seeds = [b"vote_receipt",hxui_candidate.id.to_le_bytes().as_ref(),owner.key().as_ref()],
+        seeds = [b"vote_receipt",name.as_bytes(),owner.key().as_ref()],
         bump,
     )]
     pub vote_receipt:Account<'info,VoteReceipt>,

@@ -52,4 +52,8 @@ pub use open_claimable_window::*;
 pub mod claim_tokens;
 pub use claim_tokens::*;
 
+pub mod close_receipt;
+pub use close_receipt::*;
+
+
 

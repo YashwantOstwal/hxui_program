@@ -1151,7 +1151,7 @@ describe("5) Testing of various lifecycles of a candidate", () => {
     const [receiptAddress] = PublicKey.findProgramAddressSync(
       [
         Buffer.from("vote_receipt"),
-        new BN(candidateAccount.id).toArrayLike(Buffer, "le", 4),
+        Buffer.from(candidates[3].name),
         users[0].publicKey.toBuffer(),
       ],
       program.programId,
@@ -1437,26 +1437,16 @@ describe("5) Testing of various lifecycles of a candidate", () => {
     "Attempt to close candidates[1] (withdrawn candidate) after withdraw window is closed by clearing the receipts ",
   );
 
-  it("Attempt to close a Winner candidate (candidates[0]) with claimable as FALSE by clearing all Receipts PASSES", async () => {
+  it("Attempt to close a Winner candidate (candidates[0]) with claimable as FALSE by admin clearing all Receipts PASSES", async () => {
     const candidateState = await program.account.candidate.fetch(
       candidates[0].address,
     );
-    // assert.equal(
-    //   candidateState.totalReceipts.isZero(),
-    //   false,
-    //   "Candidate has zero receipts",
-    // );
-
-    const [receiptAddress] = PublicKey.findProgramAddressSync(
-      [
-        Buffer.from("vote_receipt"),
-        new BN(candidateState.id).toArrayLike(Buffer, "le", 4),
-        users[0].publicKey.toBuffer(),
-      ],
-      program.programId,
+    assert.equal(
+      candidateState.totalReceipts.isZero(),
+      false,
+      "Candidate has zero receipts",
     );
-    const voteReceipt = await program.account.voteReceipt.fetch(receiptAddress);
-    const allUnclearedReceipts = await program.account.voteReceipt.all([
+    const allReceipts = await program.account.voteReceipt.all([
       {
         memcmp: {
           offset: 8,
@@ -1466,7 +1456,6 @@ describe("5) Testing of various lifecycles of a candidate", () => {
       },
     ]);
 
-    console.log(allUnclearedReceipts);
     const accounts = await connection.getAccountInfo(candidates[2].address);
     console.log(accounts.data);
 
