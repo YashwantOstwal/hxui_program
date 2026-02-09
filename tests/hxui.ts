@@ -1433,11 +1433,7 @@ describe("5) Testing of various lifecycles of a candidate", () => {
   // usersHXUILiteTokenBalance = [2,4,4]
   // candidatesType[WINNER(unclaimable), withdrawn, active, WINNER(claimable)]
   // candidatesVotes[2(0 receipt),0,0,1(1 receipt)]
-  it(
-    "Attempt to close candidates[1] (withdrawn candidate) after withdraw window is closed by clearing the receipts ",
-  );
-
-  it("Attempt to close a Winner candidate (candidates[0]) with claimable as FALSE by admin clearing all Receipts PASSES", async () => {
+  it("Clear all receipts for Winner candidate with claimable as FALSE to close the candidate, can only be invoked by admin", async () => {
     const candidateState = await program.account.candidate.fetch(
       candidates[0].address,
     );
@@ -1451,11 +1447,37 @@ describe("5) Testing of various lifecycles of a candidate", () => {
         memcmp: {
           offset: 8,
           encoding: "base58",
-          bytes: bs58.encode(new BN(3).toArrayLike(Buffer, "le", 4)),
+          bytes: bs58.encode(new BN(0).toArrayLike(Buffer, "le", 4)),
         },
       },
     ]);
 
+    const ixns: TransactionInstruction[] = [];
+    for (let i = 0; i < allReceipts.length; i++) {
+      const ixn = await program.methods
+        .closeReceipt(candidates[0].name)
+        .accounts({
+          admin: adminPubkey,
+          voteReceipt: allReceipts[i].publicKey,
+        })
+        .instruction();
+      ixns.push(ixn);
+    }
+    const tx = new Transaction().add(...ixns);
+
+    try {
+      await provider.sendAndConfirm(tx);
+      assert(false);
+    } catch (err) {
+      assert(true);
+    }
+    await provider.sendAndConfirm(tx, [admin]);
+  });
+
+  it("Closed a Winner candidate with claimable as FALSE (candidates[0]) can only be invoked only by admin. PASSES", async () => {
+    const candidateState = await program.account.candidate.fetch(
+      candidates[0].address,
+    );
     const accounts = await connection.getAccountInfo(candidates[2].address);
     console.log(accounts.data);
 

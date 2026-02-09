@@ -4,7 +4,9 @@ use crate::{ Candidate, CustomError,Config, VoteReceipt};
 #[derive(Accounts)]
 #[instruction(name:String)]
 pub struct CloseReceipt<'info>{
+    
     pub admin:Signer<'info>,
+
     #[account(
         has_one = admin,
         seeds = [b"hxui_config"],
