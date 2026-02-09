@@ -64,7 +64,7 @@ pub fn vote(ctx:Context<VoteCandidate>,votes:u64)->Result<()>{
     let vote_receipt = &mut ctx.accounts.vote_receipt;
     let config = & ctx.accounts.hxui_config;
     if vote_receipt.tokens == 0{
-        candidate.total_pro_voters +=1;
+        candidate.total_receipts +=1;
         vote_receipt.bump = ctx.bumps.vote_receipt;
         vote_receipt.id = candidate.id;
     }

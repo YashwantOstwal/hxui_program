@@ -59,7 +59,7 @@ pub fn initialise_candidate(ctx:Context<CreateCandidate>,name:String,description
     let poll = &mut ctx.accounts.hxui_poll;
     let id = poll.total_candidates;
 
-    candidate.set_inner(Candidate { name, description, number_of_votes: 0, is_winner: false,claimable_if_winner, can_be_winner: true, bump: ctx.bumps.hxui_candidate,claimable_basis_points_if_winner,claim_window:0,id,total_pro_voters:0 });
+    candidate.set_inner(Candidate { name, description, number_of_votes: 0, is_winner: false,claimable_if_winner, can_be_winner: true, bump: ctx.bumps.hxui_candidate,claimable_basis_points_if_winner,claim_window:0,id,total_receipts:0 });
     
     poll.current_poll_candidates.push(id);
     poll.total_candidates +=1;

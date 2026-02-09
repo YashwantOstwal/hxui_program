@@ -60,5 +60,23 @@ pub enum CustomError {
     MissingCandidate,
 
     #[msg("There are no candidates to pick winner from.")]
-    NoCandidates
+    NoCandidates,
+
+    #[msg("Close all the receipts first otherwise you will lose your money.")]
+    CloseAllReceiptAccount,
+
+    #[msg("Cannot close active componenet. Withdraw or wait until it becomes a winner")]
+    ActiveCandidateCannotBeClosed,
+
+    #[msg("The component is either claimable or withdrawn")]
+    OpenWithdrawWindowFirst,
+
+    #[msg("This component can be closed immediately")]
+    CanBeClosedImmediately,
+
+    #[msg("Tokens cannot be claimed for this candidate")]
+    TokensCannotBeClaimed,
+
+    #[msg("Close time should be greater than the current time.")]
+    InvalidClosetime
 }

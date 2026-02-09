@@ -65,7 +65,13 @@ pub fn draw_winner<'info>(ctx:Context<'_, '_, 'info, 'info,PickWinner<'_>>)->Res
         instructions::create_candidate::initialise_candidate(ctx,name,description,
         claimable_if_winner,claimable_bps)
     }
-
+    pub fn close_candidate(ctx:Context<CloseCandidate>,_name:String)->Result<()>{
+        instructions::close_candidate::close_candidate_account(ctx)
+    }
+    pub fn open_claimable_window(ctx:Context<OpenClaimableWindow>,_name:String,until:i64)->Result<()>{
+        instructions::open_claimable_window::set_closable_time(ctx,until)
+    }
+   
     pub fn fund_admin_for_candidate(ctx:Context<FundAdminForCandidate>)->Result<()>{
         instructions::fund_admin_for_candidate::transfer_rent_to_admin(ctx)
     }
@@ -85,8 +91,13 @@ pub fn draw_winner<'info>(ctx:Context<'_, '_, 'info, 'info,PickWinner<'_>>)->Res
     pub fn vote_candidate_with_hxui_lite(ctx:Context<VoteCandidateWithHxuiLite>,_name:String,votes:u64)->Result<()>{
         instructions::vote_candidate_with_hxui_lite::vote_with_hxui_lite(ctx,votes)
     }
+    
     pub fn withdraw_candidate(ctx:Context<WithdrawCandidate>,_name:String)->Result<()>{
         instructions::withdraw_candidate::stop_candidate(ctx)
+    }
+    
+    pub fn claim_tokens(ctx:Context<ClaimTokens>,_name:String)->Result<()>{
+        instructions::claim_tokens::claim_back_tokens(ctx)
     }
 
 }

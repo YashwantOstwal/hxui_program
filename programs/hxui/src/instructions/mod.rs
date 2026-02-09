@@ -43,4 +43,13 @@ pub use vote_candidate_with_hxui_lite::*;
 pub mod withdraw_candidate;
 pub use withdraw_candidate::*;
 
+pub mod close_candidate;
+pub use close_candidate::*;
+
+pub mod open_claimable_window;
+pub use open_claimable_window::*;
+
+pub mod claim_tokens;
+pub use claim_tokens::*;
+
 
