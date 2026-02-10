@@ -1276,7 +1276,7 @@ describe("5) Testing of various lifecycles of a candidate", () => {
   // usersHXUITokenBalance = [6,0,0]
   // usersHXUILiteTokenBalance = [2,4,4]
   // candidatesType[WINNER(unclaimable), withdrawn, active, WINNER(claimable)]
-  // candidatesVotes[2,0,0,1]
+  // candidatesVotes[2(1 receipt),0,0,1(1 receipt)]
   it("5.5) Cannot vote a Winner (candidates[0]) or a Withdrawn candidate (candidates[1])", async () => {
     try {
       await program.methods
@@ -1331,7 +1331,7 @@ describe("5) Testing of various lifecycles of a candidate", () => {
   // candidatesType[WINNER(unclaimable), withdrawn, active, WINNER(claimable)]
   // candidatesVotes[2(1 receipt),0,0,1(1 receipt)]
 
-  it("Attempt to close any candidate type with total receipt accounts > 0, ALWAYS FAILS (eg. candidates[0])", async () => {
+  it("Attempt to close any candidate type with receipts > 0, ALWAYS FAILS (eg. candidates[0])", async () => {
     const candidateState = await program.account.candidate.fetch(
       candidates[0].address,
     );
@@ -1391,7 +1391,7 @@ describe("5) Testing of various lifecycles of a candidate", () => {
   // usersHXUILiteTokenBalance = [2,4,4]
   // candidatesType[WINNER(unclaimable), withdrawn, active, WINNER(claimable)]
   // candidatesVotes[2(1 receipt),0,0,1(1 receipt)]
-  it("Attempt to close a Withdrawn candidate (candidates[1]) and a Claimable Winner candidate (candidates[3]) before opening  FAILS", async () => {
+  it("Attempt to close a Withdrawn candidate (candidates[1]) and a Claimable Winner candidate (candidates[3]) before opening a withdraw window. FAILS", async () => {
     try {
       await program.methods
         .closeCandidate(candidates[1].name)
@@ -1432,7 +1432,8 @@ describe("5) Testing of various lifecycles of a candidate", () => {
   // usersHXUITokenBalance = [0,0,0]
   // usersHXUILiteTokenBalance = [2,4,4]
   // candidatesType[WINNER(unclaimable), withdrawn, active, WINNER(claimable)]
-  // candidatesVotes[2(0 receipt),0,0,1(1 receipt)]
+  // candidatesVotes[2(1 receipt),0,0,1(1 receipt)]
+  it;
   it("Clear all receipts for Winner candidate with claimable as FALSE to close the candidate, can only be invoked by admin", async () => {
     const candidateState = await program.account.candidate.fetch(
       candidates[0].address,
@@ -1452,13 +1453,23 @@ describe("5) Testing of various lifecycles of a candidate", () => {
       },
     ]);
 
+    const [receiptAddress] = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from("vote_receipt"),
+        Buffer.from(candidates[0].name),
+        users[0].publicKey.toBuffer(),
+      ],
+      program.programId,
+    );
+    const receiptRent = await getBalance(receiptAddress);
+
     const ixns: TransactionInstruction[] = [];
     for (let i = 0; i < allReceipts.length; i++) {
       const ixn = await program.methods
         .closeReceipt(candidates[0].name)
         .accounts({
-          admin: adminPubkey,
           voteReceipt: allReceipts[i].publicKey,
+          admin: adminPubkey,
         })
         .instruction();
       ixns.push(ixn);
@@ -1471,15 +1482,18 @@ describe("5) Testing of various lifecycles of a candidate", () => {
     } catch (err) {
       assert(true);
     }
+    const vaultBalanceBefore = await getBalance(hxuiVaultAddress);
+
     await provider.sendAndConfirm(tx, [admin]);
+    const vaultBalanceAfter = await getBalance(hxuiVaultAddress);
+
+    assert.equal(vaultBalanceAfter - vaultBalanceBefore, receiptRent, "?");
   });
 
   it("Closed a Winner candidate with claimable as FALSE (candidates[0]) can only be invoked only by admin. PASSES", async () => {
     const candidateState = await program.account.candidate.fetch(
       candidates[0].address,
     );
-    const accounts = await connection.getAccountInfo(candidates[2].address);
-    console.log(accounts.data);
 
     assert.equal(candidateState.isWinner, true, "Candidate is not a winner");
     assert.equal(
@@ -1507,10 +1521,14 @@ describe("5) Testing of various lifecycles of a candidate", () => {
     assert.equal(candidateAccountInfo, null, "Candidate is not closed");
   });
   it(
-    "Attempt to close a winner candidate with claimable as true before the closable time",
+    "Attempt to claim back the tokens by voter for a Winner candidate with claimable as true (candidates[3]) before the closable time FAILS",
+  );
+
+  it(
+    "Attempt to close a Winner candidate with claimable as true (candidates[3]) before the closable time FAILS",
   );
   it(
-    "Close a withdrawn and a winner candidate with claimable as true after the closable time",
+    "Attempt to close a Winner candidate with claimable as true (candidates[3]) during the closable time FAILS",
   );
 });
 
