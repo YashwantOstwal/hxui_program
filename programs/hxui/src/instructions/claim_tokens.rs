@@ -4,7 +4,7 @@ use anchor_spl::{
     token_interface::{Mint,Token2022,TokenAccount,mint_to,MintTo}
 };
 
-use crate::{ Candidate, CustomError, VoteReceipt};
+use crate::{ Candidate, CustomError, VoteReceipt, CandidateStatus};
 #[derive(Accounts)]
 #[instruction(name:String)]
 pub struct ClaimTokens<'info>{
@@ -58,8 +58,10 @@ pub struct ClaimTokens<'info>{
 pub fn claim_back_tokens(ctx:Context<ClaimTokens>)->Result<()>{
     let candidate = &mut ctx.accounts.hxui_candidate;
 
-    let is_withdrawn:bool = candidate.can_be_winner == false && candidate.is_winner == false;
-    let is_claimable_winner:bool = candidate.is_winner == true && candidate.claimable_if_winner == true;
+    // let is_withdrawn:bool = candidate.can_be_winner == false && candidate.is_winner == false;
+    // let is_claimable_winner:bool = candidate.is_winner == true && candidate.claimable_if_winner == true;
+    let is_withdrawn = candidate.candidate_status == CandidateStatus::Withdrawn;
+    let is_claimable_winner = candidate.candidate_status == CandidateStatus::ClaimableWinner;
     require!(is_withdrawn || is_claimable_winner,CustomError::TokensCannotBeClaimed);
     let vote_receipt = & ctx.accounts.vote_receipt;
 

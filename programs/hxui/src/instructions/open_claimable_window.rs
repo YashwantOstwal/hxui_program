@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{CustomError,Candidate,Config};
+use crate::{Candidate, CandidateStatus, Config, CustomError};
 #[derive(Accounts)]
 #[instruction(name:String)]
 pub struct OpenClaimableWindow<'info>{
@@ -23,10 +23,16 @@ pub struct OpenClaimableWindow<'info>{
 
 pub fn set_closable_time(ctx:Context<OpenClaimableWindow>,until:i64)->Result<()>{
     let candidate: &mut Account<'_, Candidate> = &mut ctx.accounts.hxui_candidate;
-    require!(!(candidate.is_winner == true && candidate.claimable_if_winner == false),CustomError::CanBeClosedImmediately);
-    require!(candidate.can_be_winner == false,CustomError::ActiveCandidateCannotBeClosed);
+
+    // we need the withdraw window to be opened only for claimable winner and withdrawn candidate.
+    //We expect the candidate for which the withdraw window is opened should not be an active or winner candidate.
+    require!(candidate.candidate_status != CandidateStatus::Winner,CustomError::CanBeClosedImmediately);
+    require!(candidate.candidate_status != CandidateStatus::Active,CustomError::ActiveCandidateCannotBeClosed);
+
     let clock = Clock::get()?;
+
     require!(until > clock.unix_timestamp,CustomError::InvalidClosetime);
+    
     candidate.claim_window = until;
     Ok(())
 }

@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{CustomError,Candidate,Config};
+use crate::{Candidate, CandidateStatus, Config, CustomError};
 #[derive(Accounts)]
 #[instruction(name:String)]
 pub struct CloseCandidate<'info>{
@@ -34,14 +34,16 @@ pub struct CloseCandidate<'info>{
 
 pub fn close_candidate_account(ctx:Context<CloseCandidate>)->Result<()>{
     let candidate: &mut Account<'_, Candidate> = &mut ctx.accounts.hxui_candidate;
-    require!(candidate.can_be_winner == false,CustomError::ActiveCandidateCannotBeClosed);
+    
+    require!(candidate.candidate_status != CandidateStatus::Active,CustomError::ActiveCandidateCannotBeClosed);
+
 
     let clock = Clock::get()?;
-    // winner with claimable
-    if (candidate.is_winner == true && candidate.claimable_if_winner == true) ||
-    //withdrawn component.
-    (candidate.is_winner == false && candidate.can_be_winner == false)
-    {
+          let is_withdrawn = candidate.candidate_status == CandidateStatus::Withdrawn;
+    let is_claimable_winner = candidate.candidate_status == CandidateStatus::ClaimableWinner;
+
+    // A withdrawn candidate and a claimable winner candidate can be closed immediately if it has non zero receipts.
+    if (is_withdrawn || is_claimable_winner) && candidate.total_receipts!=0 {
         require!(candidate.claim_window!=0 && clock.unix_timestamp > candidate.claim_window ,CustomError::OpenWithdrawWindowFirst);
     }
     require!(candidate.total_receipts == 0,CustomError::CloseAllReceiptAccount);

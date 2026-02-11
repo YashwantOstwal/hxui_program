@@ -4,7 +4,7 @@ use anchor_spl::{
     associated_token::AssociatedToken,
     token_interface::{Mint,TokenAccount,Token2022,Burn,burn},
 };
-use crate::{Candidate, Config, CustomError,ANCHOR_DISCRIMINATOR,VoteReceipt};
+use crate::{Candidate, Config, CustomError,ANCHOR_DISCRIMINATOR,VoteReceipt, CandidateStatus};
 #[derive(Accounts)]
 #[instruction(name:String)]
 pub struct VoteCandidate<'info>{
@@ -33,8 +33,7 @@ pub struct VoteCandidate<'info>{
         mut,
         seeds = [b"hxui_candidate",name.as_bytes()],
         bump = hxui_candidate.bump,
-        constraint = hxui_candidate.is_winner == false @ CustomError::CandidateAlreadyAWinner,
-        constraint = hxui_candidate.can_be_winner == true @ CustomError::CandidateIsNoLongerVotable
+        constraint = hxui_candidate.candidate_status == CandidateStatus::Active @ CustomError::OnlyActiveCandidateCanBeVoted,
     )]
     pub hxui_candidate:Account<'info,Candidate>,
 

@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{Candidate, Config, CustomError, Poll};
+use crate::{Candidate, CandidateStatus, Config, CustomError, Poll};
 #[derive(Accounts)]
 pub struct PickWinner<'info>{
     pub admin:Signer<'info>,
@@ -59,8 +59,15 @@ pub fn pick_winner<'info>(ctx:Context<'_, '_, 'info, 'info,PickWinner<'_>>)->Res
             winner_index = i;
         }
     }
-    candidates[winner_index].is_winner = true;
-    candidates[winner_index].can_be_winner = false;
+
+    if candidates[winner_index].claimable_if_winner {
+        candidates[winner_index].candidate_status = CandidateStatus::ClaimableWinner
+    }else {
+        candidates[winner_index].candidate_status = CandidateStatus::Winner
+
+    }
+    // candidates[winner_index].is_winner = true;
+    // candidates[winner_index].can_be_winner = false;
     candidates[winner_index].exit(ctx.program_id)?;
     
     if let Some(index) = poll.current_poll_candidates.iter().position(|&x| x == candidates[winner_index].id){

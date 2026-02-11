@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{ Candidate, CustomError,Config, VoteReceipt};
+use crate::{ Candidate, CandidateStatus, Config, CustomError, VoteReceipt};
 #[derive(Accounts)]
 #[instruction(name:String)]
 pub struct ClearReceipt<'info>{
@@ -39,15 +39,12 @@ pub struct ClearReceipt<'info>{
 pub fn close_receipt_account(ctx:Context<ClearReceipt>)->Result<()>{
     let candidate = &mut ctx.accounts.hxui_candidate;
 
-    require!(!(candidate.is_winner == false && candidate.can_be_winner == true),CustomError::ActiveCandidateCannotBeClosed);
-    let is_withdrawn:bool = candidate.can_be_winner == false && candidate.is_winner == false;
-    let is_claimable_winner:bool = candidate.is_winner == true && candidate.claimable_if_winner == true;
-    if is_withdrawn || is_claimable_winner {
-        let clock = Clock::get()?;
-       {
-        require!(candidate.claim_window!=0 && clock.unix_timestamp > candidate.claim_window ,CustomError::OpenWithdrawWindowFirst);
-    }
-    }
+    // This ixn can only be invoked for vote receipts of candidate whose status is winner, withdrawn or claimable winner after the withdraw window is closed.
+    require!(candidate.candidate_status != CandidateStatus::Active,CustomError::ReceiptsCannotBeClosedForAnActiveCandidate);
+
+    let clock = Clock::get()?;
+    require!(candidate.claim_window!=0 && clock.unix_timestamp > candidate.claim_window ,CustomError::OpenWithdrawWindowFirst);
+    
     candidate.total_receipts -= 1;
     Ok(())
 }

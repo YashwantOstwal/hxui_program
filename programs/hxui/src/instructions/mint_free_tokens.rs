@@ -61,7 +61,7 @@ pub fn mint_tokens_for_free(ctx:Context<MintFreeTokens>,amount:u64)->Result<()>{
         hxui_lite_free_mints_counter.remaining_free_tokens = FREE_TOKENS_PER_EPOCH;
     }
     let hxui_lite_minted_timestamp = &mut ctx.accounts.hxui_lite_minted_timestamp;
-    require!(hxui_lite_minted_timestamp.closable_timestamp == 0,CustomError::UnregisteredFreeTokens);
+    require!(hxui_lite_minted_timestamp.closable_timestamp == 0,CustomError::UnregisteredForFreeTokens);
     require!(current_unix_timestamp >= hxui_lite_minted_timestamp.next_mintable_timestamp,CustomError::RateLimitExceeded);
 
     hxui_lite_minted_timestamp.next_mintable_timestamp = current_unix_timestamp + COOLDOWN;

@@ -55,5 +55,8 @@ pub use claim_tokens::*;
 pub mod clear_receipt;
 pub use clear_receipt::*;
 
+pub mod create_new_account;
+pub use create_new_account::*;
+
 
 

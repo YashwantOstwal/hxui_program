@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{Candidate,CustomError,Poll};
+use crate::{Candidate,CustomError,Poll, CandidateStatus};
 
 #[derive(Accounts)]
 #[instruction(name:String)]
@@ -12,8 +12,10 @@ pub struct WithdrawCandidate<'info>{
         mut,
         seeds = [b"hxui_candidate",name.as_bytes()],
         bump = hxui_candidate.bump,
-        constraint = hxui_candidate.is_winner == false @ CustomError::CandidateAlreadyAWinner,
-        constraint = hxui_candidate.can_be_winner == true @ CustomError::CandidateIsNoLongerVotable
+        // constraint = hxui_candidate.is_winner == false @ CustomError::CandidateAlreadyAWinner,
+        // constraint = hxui_candidate.can_be_winner == true @ CustomError::CandidateIsNoLongerVotable,
+
+        constraint = hxui_candidate.candidate_status == CandidateStatus::Active @ CustomError::OnlyActiveCandidateCanBeWithdrawn,
     )]
     pub hxui_candidate:Account<'info,Candidate>,
 
@@ -28,7 +30,8 @@ pub struct WithdrawCandidate<'info>{
 
 pub fn stop_candidate(ctx:Context<WithdrawCandidate>)->Result<()>{
     let candidate = &mut ctx.accounts.hxui_candidate;
-    candidate.can_be_winner = false;
+    candidate.candidate_status = CandidateStatus::Withdrawn;
+    // candidate.can_be_winner = false;
 
     let poll = &mut ctx.accounts.hxui_poll;
   if let Some(index) = poll.current_poll_candidates.iter().position(|&id| id == candidate.id){

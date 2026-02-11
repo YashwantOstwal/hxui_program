@@ -5,7 +5,7 @@ use anchor_spl::{
 
 
 
-use crate::{ANCHOR_DISCRIMINATOR, Config, CustomError, FREE_TOKENS_PER_EPOCH, FreeTokensCounter, Voter};
+use crate::{ANCHOR_DISCRIMINATOR, Config, CustomError, FREE_TOKENS_PER_EPOCH, FreeTokensCounter, VoteReceipt};
 #[derive(Accounts)]
 pub struct InitialiseDapp<'info>{
     #[account(mut)]
@@ -66,7 +66,7 @@ pub struct InitialiseDapp<'info>{
 
 pub fn initialise_config(ctx:Context<InitialiseDapp>,config:Config)->Result<()>{
     let rent = Rent::get()?;
-    require!(config.price_per_token >= rent.minimum_balance(Voter::INIT_SPACE) - rent.minimum_balance(0),CustomError::TokenPriceNotSufficient);
+    require!(2* config.price_per_token >= rent.minimum_balance(VoteReceipt::INIT_SPACE) ,CustomError::TokenPriceNotSufficient);
     let config_account = &mut ctx.accounts.hxui_config;
     config_account.set_inner(config);
 

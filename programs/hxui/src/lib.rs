@@ -13,9 +13,10 @@ pub use errors::*;
 declare_id!("EpF1FNjziFb8wrR1p5usVW1AbcU7saCt8deoiVY31zE7");
 #[program]
 pub mod hxui {
+
     use super::*;
 
-    pub fn initialise_dapp(ctx:Context<InitialiseDapp>,price_per_token:u64,tokens_per_vote:u64,is_claim_back_offer_live:bool,claim_basis_points:u32)->Result<()>{
+    pub fn initialise_dapp(ctx:Context<InitialiseDapp>,price_per_token:u64,tokens_per_vote:u64)->Result<()>{
         let config_bump: u8  = ctx.bumps.hxui_config;
         let admin_pubkey: Pubkey = ctx.accounts.admin.key();
         instructions::initialise_dapp::initialise_config(
@@ -24,8 +25,6 @@ pub mod hxui {
                 admin:admin_pubkey,
                 price_per_token,
                 tokens_per_vote,
-                is_claim_back_offer_live,
-                claim_basis_points,
                 bump:config_bump
             }
         )
@@ -104,40 +103,12 @@ pub fn draw_winner<'info>(ctx:Context<'_, '_, 'info, 'info,PickWinner<'_>>)->Res
         instructions::clear_receipt::close_receipt_account(ctx)
     }
 
-    pub fn temp(ctx:Context<Temp>)->Result<()>{
-        let temp_account = &mut ctx.accounts.temp_account;
-        temp_account.my_enum = Days::Tuesday;
-
-        Ok(())
-    }
-
+    pub fn create_new_account(ctx:Context<CreateNewAccount>)->Result<()>{
+        instructions::create_new_account::create(ctx)
 }
+pub fn initialise_account(ctx:Context<InitialiseNewAccount>)->Result<()>{
+    ctx.accounts.new_account.id = 5;
+    Ok(())
+}}
 
-#[derive(Accounts)]
 
-pub struct Temp<'info>{
-    #[account(mut)]
-    pub admin:Signer<'info>,
-    #[account(
-        init,
-        payer = admin,
-        space = 8 + AccountWithEnum::INIT_SPACE,
-        seeds = [b"hxui_tem"],
-        bump,
-    )]
-    pub temp_account:Account<'info,AccountWithEnum>,
-
-    pub system_program:Program<'info,System>
-}
-
-#[account]
-#[derive(InitSpace)]
-pub struct AccountWithEnum{
-    my_enum: Days
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq,InitSpace)]
-pub enum Days {
-    Monday,
-    Tuesday,
-}

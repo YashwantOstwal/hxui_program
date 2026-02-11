@@ -42,7 +42,7 @@ pub enum CustomError {
     AlreadyUnregistered,
 
     #[msg("UnregisteredFreeTokens.")]
-    UnregisteredFreeTokens,
+    UnregisteredForFreeTokens,
 
     #[msg("Winner for current poll is already drawn.")]
     WinnerForCurrentPollAlreadyDrawn,
@@ -81,5 +81,16 @@ pub enum CustomError {
     InvalidClosetime,
 
     #[msg("Mismatch in candidate and its receipt.")]
-    InvalidReceiptForCandidate
+    InvalidReceiptForCandidate,
+
+    #[msg("Only active candidate can be voted.")]
+    OnlyActiveCandidateCanBeVoted,
+
+
+    #[msg("Only active candidate can be withdrawn.")]
+    OnlyActiveCandidateCanBeWithdrawn,
+
+    #[msg("Receipts cannot be closed for an active candidate.")]
+    ReceiptsCannotBeClosedForAnActiveCandidate
+
 }
