@@ -967,11 +967,7 @@ describe("5) Testing of various lifecycles of a candidate", () => {
   // usersHXUITokenBalance = [8,0,0]
   // usersHXUILiteTokenBalance = [4,4,4]
 
-  before(() => {
-    // Create few candidates
-  });
-
-  it("5.1) Create a candidate", async () => {
+  it("5.1) Create few candidates", async () => {
     const adminBalanceBefore = await getBalance(adminPubkey);
     const pollAccountBefore = await program.account.poll.fetch(pollAddress);
     await program.methods
@@ -1029,8 +1025,6 @@ describe("5) Testing of various lifecycles of a candidate", () => {
     assert(
       pollAccountAfter.currentPollCandidates.includes(candidateAccount.id),
     );
-  });
-  it("5.3) Creating few more candidates", async () => {
     for (let i = 0; i < 3; i++) {
       const newCandidateName = "ABCD" + i;
       const newCandidateDescription = candidates[0].description;
@@ -1099,7 +1093,7 @@ describe("5) Testing of various lifecycles of a candidate", () => {
   });
   // usersHXUITokenBalance = [8,0,0]
   // usersHXUILiteTokenBalance = [2,4,4]
-  // candidatesType[unclaimable if winner, active, active, claimable if winner]
+  // candidatesType[active, active, active, active]
   // candidatesVotes[1,0,0,0]
   it("5.2) users[0] gives 1 vote to candidates[0] and 1 vote to candidates[3] with paid tokens ", async () => {
     const votes = 1;
@@ -1170,9 +1164,9 @@ describe("5) Testing of various lifecycles of a candidate", () => {
   });
   // usersHXUITokenBalance = [4,0,0]
   // usersHXUILiteTokenBalance = [2,4,4]
-  // candidatesType[unclaimable if winner, active, active, claimable if winner]
+  // candidatesType[active, active, active, active]
   // candidatesVotes[2,0,0,1]
-  it("5.5) Picking a winner (should be candidates[0]) after poll has ended", async () => {
+  it("5.5) Picking 2 winners by (should be candidates[0] and then candidates[3]) after poll has ended", async () => {
     for (let i = 0; i < 2; i++) {
       let expectedWinnerCandidateId: number;
       let maxVotes: anchor.BN = new BN(0);
@@ -1466,9 +1460,11 @@ describe("5) Testing of various lifecycles of a candidate", () => {
     const ixns: TransactionInstruction[] = [];
     for (let i = 0; i < allReceipts.length; i++) {
       const ixn = await program.methods
-        .closeReceipt(candidates[0].name)
+
+        .clearReceipt(candidates[0].name)
         .accounts({
           voteReceipt: allReceipts[i].publicKey,
+          // ignore the swiggyly admin as signer is required.
           admin: adminPubkey,
         })
         .instruction();
@@ -1477,6 +1473,7 @@ describe("5) Testing of various lifecycles of a candidate", () => {
     const tx = new Transaction().add(...ixns);
 
     try {
+      // fails if admin is not a signer.
       await provider.sendAndConfirm(tx);
       assert(false);
     } catch (err) {
@@ -1531,6 +1528,25 @@ describe("5) Testing of various lifecycles of a candidate", () => {
     "Attempt to close a Winner candidate with claimable as true (candidates[3]) during the closable time FAILS",
   );
 });
+
+// describe("temp", () => {
+//   it("", async () => {
+//     await program.methods
+//       .temp()
+//       .accounts({ admin: adminPubkey })
+//       .signers([admin])
+//       .rpc();
+
+//     const [address] = PublicKey.findProgramAddressSync(
+//       [Buffer.from("hxui_tem")],
+//       program.programId,
+//     );
+
+//     const account = await program.account.accountWithEnum.fetch(address);
+//     console.log(!!account.myEnum.monday == false);
+//     console.log(!!account.myEnum.tuesday == true);
+//   });
+// });
 
 // describe("5) vote_candidate instruction testing", () => {
 //   const name = "Lorem ipsum dolor sit amet, 4321";

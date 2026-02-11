@@ -52,8 +52,8 @@ pub use open_claimable_window::*;
 pub mod claim_tokens;
 pub use claim_tokens::*;
 
-pub mod close_receipt;
-pub use close_receipt::*;
+pub mod clear_receipt;
+pub use clear_receipt::*;
 
 
 

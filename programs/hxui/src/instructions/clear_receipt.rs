@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use crate::{ Candidate, CustomError,Config, VoteReceipt};
 #[derive(Accounts)]
 #[instruction(name:String)]
-pub struct CloseReceipt<'info>{
+pub struct ClearReceipt<'info>{
     
     pub admin:Signer<'info>,
 
@@ -36,7 +36,7 @@ pub struct CloseReceipt<'info>{
    
 }
 
-pub fn close_receipt_account(ctx:Context<CloseReceipt>)->Result<()>{
+pub fn close_receipt_account(ctx:Context<ClearReceipt>)->Result<()>{
     let candidate = &mut ctx.accounts.hxui_candidate;
 
     require!(!(candidate.is_winner == false && candidate.can_be_winner == true),CustomError::ActiveCandidateCannotBeClosed);

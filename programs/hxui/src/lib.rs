@@ -100,8 +100,44 @@ pub fn draw_winner<'info>(ctx:Context<'_, '_, 'info, 'info,PickWinner<'_>>)->Res
         instructions::claim_tokens::claim_back_tokens(ctx)
     }
 
-    pub fn close_receipt(ctx:Context<CloseReceipt>,_name:String)->Result<()>{
-        instructions::close_receipt::close_receipt_account(ctx)
+    pub fn clear_receipt(ctx:Context<ClearReceipt>,_name:String)->Result<()>{
+        instructions::clear_receipt::close_receipt_account(ctx)
     }
 
+    pub fn temp(ctx:Context<Temp>)->Result<()>{
+        let temp_account = &mut ctx.accounts.temp_account;
+        temp_account.my_enum = Days::Tuesday;
+
+        Ok(())
+    }
+
+}
+
+#[derive(Accounts)]
+
+pub struct Temp<'info>{
+    #[account(mut)]
+    pub admin:Signer<'info>,
+    #[account(
+        init,
+        payer = admin,
+        space = 8 + AccountWithEnum::INIT_SPACE,
+        seeds = [b"hxui_tem"],
+        bump,
+    )]
+    pub temp_account:Account<'info,AccountWithEnum>,
+
+    pub system_program:Program<'info,System>
+}
+
+#[account]
+#[derive(InitSpace)]
+pub struct AccountWithEnum{
+    my_enum: Days
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq,InitSpace)]
+pub enum Days {
+    Monday,
+    Tuesday,
 }
