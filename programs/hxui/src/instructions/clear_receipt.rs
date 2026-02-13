@@ -40,11 +40,24 @@ pub fn close_receipt_account(ctx:Context<ClearReceipt>)->Result<()>{
     let candidate = &mut ctx.accounts.hxui_candidate;
 
     // This ixn can only be invoked for vote receipts of candidate whose status is winner, withdrawn or claimable winner after the withdraw window is closed.
-    require!(candidate.candidate_status != CandidateStatus::Active,CustomError::ReceiptsCannotBeClosedForAnActiveCandidate);
+    // require!(candidate.candidate_status != CandidateStatus::Active,CustomError::ReceiptsCannotBeClosedForAnActiveCandidate);
 
-    let clock = Clock::get()?;
-    require!(candidate.claim_window!=0 && clock.unix_timestamp > candidate.claim_window ,CustomError::OpenWithdrawWindowFirst);
     
     candidate.total_receipts -= 1;
-    Ok(())
+
+    match candidate.candidate_status {
+        CandidateStatus::Active=>{
+            err!(CustomError::ReceiptsCannotBeClosedForAnActiveCandidate)
+        },
+        CandidateStatus::Winner=>{
+            Ok(())
+        }
+        _=>{
+            let clock = Clock::get()?;
+            require!(candidate.claim_window!=0 ,CustomError::OpenWithdrawWindowFirst);
+            require!(clock.unix_timestamp > candidate.claim_window,CustomError::WaitUntilWithdrawWindowIsClosed);
+            Ok(())
+        }
+    }
+
 }

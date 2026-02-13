@@ -59,6 +59,9 @@ pub enum CustomError {
     #[msg("Not all candidates have been passed.")]
     MissingCandidate,
 
+    #[msg("Pass all the active candidates mentioned in the poll account.")]
+    PassAllActiveCandidates,
+
     #[msg("There are no candidates to pick winner from.")]
     NoCandidates,
 
@@ -71,10 +74,13 @@ pub enum CustomError {
     #[msg("The component is either claimable or withdrawn")]
     OpenWithdrawWindowFirst,
 
-    #[msg("This component can be closed immediately")]
-    CanBeClosedImmediately,
+    #[msg("This component can be closed immediately by clearing all the receipts.")]
+    CanBeClosedImmediatelyByClearingReceipts,
 
-    #[msg("Tokens cannot be claimed for this candidate")]
+        #[msg("This component can be closed immediately without the withdraw window as there are 0 receipts.")]
+    CanBeClosedImmediatelyWithoutWithdrawWindow,
+
+    #[msg("Tokens cannot be claimed while the candidate is active or is unclaimable winner.")]
     TokensCannotBeClaimed,
 
     #[msg("Close time should be greater than the current time.")]
@@ -91,6 +97,18 @@ pub enum CustomError {
     OnlyActiveCandidateCanBeWithdrawn,
 
     #[msg("Receipts cannot be closed for an active candidate.")]
-    ReceiptsCannotBeClosedForAnActiveCandidate
+    ReceiptsCannotBeClosedForAnActiveCandidate,
+
+    #[msg("Votes must be greater than zero.")]
+    VotesMustBeGreaterThan0,
+
+    #[msg("Tokens cannot be claimed now. Either the withdraw window is yet to open or closed.")]
+    UnclaimableNow,
+
+    #[msg("Wait until the withdraw window is closed.")]
+    WaitUntilWithdrawWindowIsClosed,
+
+    #[msg("Active candidate cannot open a withdraw window.")]
+    ActiveCandidateCannotOpenWithdrawWindow
 
 }

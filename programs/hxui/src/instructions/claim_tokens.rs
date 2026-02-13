@@ -58,21 +58,20 @@ pub struct ClaimTokens<'info>{
 pub fn claim_back_tokens(ctx:Context<ClaimTokens>)->Result<()>{
     let candidate = &mut ctx.accounts.hxui_candidate;
 
-    // let is_withdrawn:bool = candidate.can_be_winner == false && candidate.is_winner == false;
-    // let is_claimable_winner:bool = candidate.is_winner == true && candidate.claimable_if_winner == true;
     let is_withdrawn = candidate.candidate_status == CandidateStatus::Withdrawn;
     let is_claimable_winner = candidate.candidate_status == CandidateStatus::ClaimableWinner;
     require!(is_withdrawn || is_claimable_winner,CustomError::TokensCannotBeClaimed);
+
+    let clock = Clock::get()?;
+    require!(candidate.claim_window!=0 && clock.unix_timestamp <= candidate.claim_window,CustomError::UnclaimableNow);
+    
     let vote_receipt = & ctx.accounts.vote_receipt;
 
     candidate.total_receipts -= 1;
     let amount = if is_withdrawn {
         vote_receipt.tokens
-    } else if is_claimable_winner{
-        vote_receipt.tokens.div_ceil(2)
     } else {
-        // control will never reach this case
-        0
+        vote_receipt.tokens.div_ceil(2)
     };
     let seeds: &[&[u8]] = &[b"hxui_mint",&[ctx.bumps.hxui_mint]];
     let signer_seeds: [&[&[u8]]; 1] = [&seeds[..]];

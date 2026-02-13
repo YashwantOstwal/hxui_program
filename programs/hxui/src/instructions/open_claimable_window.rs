@@ -24,11 +24,15 @@ pub struct OpenClaimableWindow<'info>{
 pub fn set_closable_time(ctx:Context<OpenClaimableWindow>,until:i64)->Result<()>{
     let candidate: &mut Account<'_, Candidate> = &mut ctx.accounts.hxui_candidate;
 
-    // we need the withdraw window to be opened only for claimable winner and withdrawn candidate.
-    //We expect the candidate for which the withdraw window is opened should not be an active or winner candidate.
-    require!(candidate.candidate_status != CandidateStatus::Winner,CustomError::CanBeClosedImmediately);
-    require!(candidate.candidate_status != CandidateStatus::Active,CustomError::ActiveCandidateCannotBeClosed);
-
+    if candidate.candidate_status == CandidateStatus::Active {
+        return err!(CustomError::ActiveCandidateCannotOpenWithdrawWindow)
+    } 
+    if candidate.total_receipts == 0 {
+        return err!(CustomError::CanBeClosedImmediatelyWithoutWithdrawWindow)
+    }
+     if candidate.candidate_status == CandidateStatus::Winner {
+        return err!(CustomError::CanBeClosedImmediatelyByClearingReceipts)
+    } 
     let clock = Clock::get()?;
 
     require!(until > clock.unix_timestamp,CustomError::InvalidClosetime);

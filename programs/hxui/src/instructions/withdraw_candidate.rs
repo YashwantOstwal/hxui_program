@@ -12,8 +12,6 @@ pub struct WithdrawCandidate<'info>{
         mut,
         seeds = [b"hxui_candidate",name.as_bytes()],
         bump = hxui_candidate.bump,
-        // constraint = hxui_candidate.is_winner == false @ CustomError::CandidateAlreadyAWinner,
-        // constraint = hxui_candidate.can_be_winner == true @ CustomError::CandidateIsNoLongerVotable,
 
         constraint = hxui_candidate.candidate_status == CandidateStatus::Active @ CustomError::OnlyActiveCandidateCanBeWithdrawn,
     )]

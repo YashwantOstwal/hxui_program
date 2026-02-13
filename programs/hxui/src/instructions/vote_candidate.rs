@@ -59,6 +59,7 @@ pub struct VoteCandidate<'info>{
 }
 
 pub fn vote(ctx:Context<VoteCandidate>,votes:u64)->Result<()>{
+    require!(votes > 0,CustomError::VotesMustBeGreaterThan0);
     let candidate = &mut ctx.accounts.hxui_candidate;
     let vote_receipt = &mut ctx.accounts.vote_receipt;
     let config = & ctx.accounts.hxui_config;

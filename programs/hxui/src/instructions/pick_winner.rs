@@ -29,14 +29,14 @@ pub fn pick_winner<'info>(ctx:Context<'_, '_, 'info, 'info,PickWinner<'_>>)->Res
     require!(!poll.current_poll_winner_drawn,CustomError::WinnerForCurrentPollAlreadyDrawn);
 
     let mut missing_candidates = poll.current_poll_candidates.clone();
-    require!(!missing_candidates.is_empty(),CustomError::NoCandidates);
-    let total_candidates = missing_candidates.len();
     let mut candidates= Vec::new();
     
-
+    
+    require!(!missing_candidates.is_empty(),CustomError::NoCandidates);
+    require!(!ctx.remaining_accounts.is_empty(),CustomError::PassAllActiveCandidates);
     for account_info in ctx.remaining_accounts{
         let candidate:Account<Candidate> = Account::try_from(account_info)?;
-
+        
        match missing_candidates.iter().position(|&x| x == candidate.id){
         Some(index)=>{
             missing_candidates.remove(index);
@@ -47,8 +47,8 @@ pub fn pick_winner<'info>(ctx:Context<'_, '_, 'info, 'info,PickWinner<'_>>)->Res
         }
     }
 }
-    require!(missing_candidates.is_empty(),CustomError::MissingCandidate);
-    require!(candidates.len() == total_candidates,CustomError::AllFreeTokensForTheDayMinted);
+    require!(missing_candidates.is_empty(),CustomError::PassAllActiveCandidates);
+    // require!(candidates.len() == total_candidates,CustomError::);
     let mut winner_index = 0;
 
     for i in 1..candidates.len(){

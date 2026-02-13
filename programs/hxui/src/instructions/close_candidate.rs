@@ -35,19 +35,21 @@ pub struct CloseCandidate<'info>{
 pub fn close_candidate_account(ctx:Context<CloseCandidate>)->Result<()>{
     let candidate: &mut Account<'_, Candidate> = &mut ctx.accounts.hxui_candidate;
     
-    require!(candidate.candidate_status != CandidateStatus::Active,CustomError::ActiveCandidateCannotBeClosed);
+    if candidate.candidate_status == CandidateStatus::Active {
+        return err!(CustomError::ActiveCandidateCannotBeClosed)
+    }
 
-
-    let clock = Clock::get()?;
-          let is_withdrawn = candidate.candidate_status == CandidateStatus::Withdrawn;
+    let is_withdrawn = candidate.candidate_status == CandidateStatus::Withdrawn;
     let is_claimable_winner = candidate.candidate_status == CandidateStatus::ClaimableWinner;
 
-    // A withdrawn candidate and a claimable winner candidate can be closed immediately if it has non zero receipts.
+    // A withdrawn candidate and a claimable winner candidate need not a withdraw window if receipts is 0.
     if (is_withdrawn || is_claimable_winner) && candidate.total_receipts!=0 {
-        require!(candidate.claim_window!=0 && clock.unix_timestamp > candidate.claim_window ,CustomError::OpenWithdrawWindowFirst);
+        require!(candidate.claim_window!=0 ,CustomError::OpenWithdrawWindowFirst);
+
+        let clock = Clock::get()?;
+        require!(clock.unix_timestamp > candidate.claim_window,CustomError::WaitUntilWithdrawWindowIsClosed);
     }
     require!(candidate.total_receipts == 0,CustomError::CloseAllReceiptAccount);
     
-
     Ok(())
 }
