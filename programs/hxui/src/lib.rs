@@ -56,13 +56,13 @@ pub fn draw_winner<'info>(ctx:Context<'_, '_, 'info, 'info,PickWinner<'_>>)->Res
     }
 
     pub fn mint_free_tokens(ctx:Context<MintFreeTokens>)->Result<()>{
-        instructions::mint_free_tokens::mint_tokens_for_free(ctx,4)
+        instructions::mint_free_tokens::mint_tokens_for_free(ctx,1)
     }
     
     pub fn create_candidate(ctx:Context<CreateCandidate>,name:String,description:String,
-    claimable_if_winner:bool,claimable_bps:Option<u16>)->Result<()>{
+    claimable_if_winner:bool)->Result<()>{
         instructions::create_candidate::initialise_candidate(ctx,name,description,
-        claimable_if_winner,claimable_bps)
+        claimable_if_winner)
     }
     pub fn close_candidate(ctx:Context<CloseCandidate>,_name:String)->Result<()>{
         instructions::close_candidate::close_candidate_account(ctx)
@@ -87,7 +87,7 @@ pub fn draw_winner<'info>(ctx:Context<'_, '_, 'info, 'info,PickWinner<'_>>)->Res
         instructions::vote_candidate::vote(ctx,votes)
     }
 
-    pub fn vote_candidate_with_hxui_lite(ctx:Context<VoteCandidateWithHxuiLite>,_name:String,votes:u64)->Result<()>{
+    pub fn vote_candidate_free(ctx:Context<VoteCandidateWithHxuiLite>,_name:String,votes:u64)->Result<()>{
         instructions::vote_candidate_with_hxui_lite::vote_with_hxui_lite(ctx,votes)
     }
     

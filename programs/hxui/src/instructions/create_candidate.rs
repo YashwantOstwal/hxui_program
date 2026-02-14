@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use anchor_spl::{
-    token_interface::{Mint,Token2022},
+    token_interface::{Token2022},
 };
 use crate::{ANCHOR_DISCRIMINATOR, Candidate, CandidateStatus, Config, CustomError, Poll };
 
@@ -29,16 +29,6 @@ pub struct CreateCandidate<'info>{
     pub hxui_candidate:Account<'info,Candidate>,
 
     #[account(
-        seeds = [b"hxui_mint"],
-        bump,
-        mint::decimals = 0,
-        mint::authority = hxui_mint,
-        mint::token_program = token_program
-    )]
-    pub hxui_mint:InterfaceAccount<'info,Mint>,
-
-
-    #[account(
         mut,
         seeds = [b"hxui_poll"],
         bump = hxui_poll.bump,
@@ -50,7 +40,7 @@ pub struct CreateCandidate<'info>{
 }
 
 
-pub fn initialise_candidate(ctx:Context<CreateCandidate>,name:String,description:String,claimable_if_winner:bool,_claimable_bps:Option<u16>)->Result<()>{
+pub fn initialise_candidate(ctx:Context<CreateCandidate>,name:String,description:String,claimable_if_winner:bool)->Result<()>{
 //    let claimable_basis_points_if_winner = match claimable_bps{
 //         Some(basis_points)=>basis_points,
 //         None=>5000

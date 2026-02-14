@@ -159,9 +159,8 @@ describe("1) initialise_dapp instruction testing", () => {
       .signers([admin])
       .rpc();
 
-    const hxuiConfigAccount = await program.account.config.fetch(
-      hxuiConfigAddress,
-    );
+    const hxuiConfigAccount =
+      await program.account.config.fetch(hxuiConfigAddress);
     // config check
     assert(hxuiConfigAccount.admin.equals(adminPubkey));
     assert(hxuiConfigAccount.tokensPerVote.eq(tokensPerVote));
@@ -808,9 +807,8 @@ describe("5) Buying HXUI tokens for users[0]", async () => {
       .rpc();
     const userBalanceAfter = await getBalance(users[0].publicKey);
 
-    const tokenAccountInfoAfterPurchase = await connection.getAccountInfo(
-      tokenAddress,
-    );
+    const tokenAccountInfoAfterPurchase =
+      await connection.getAccountInfo(tokenAddress);
     await sleep(2);
     const tokenAccount = unpackAccount(
       tokenAddress,
@@ -826,9 +824,8 @@ describe("5) Buying HXUI tokens for users[0]", async () => {
     // );
 
     assert.equal(tokenAccount.amount, BigInt(tokens));
-    const hxuiConfigAccount = await program.account.config.fetch(
-      hxuiConfigAddress,
-    );
+    const hxuiConfigAccount =
+      await program.account.config.fetch(hxuiConfigAddress);
 
     const tokenAccountRent = await getBalance(tokenAddress);
     assert(
@@ -871,9 +868,8 @@ describe("5) Buying HXUI tokens for users[0]", async () => {
       TOKEN_2022_PROGRAM_ID,
     );
     assert.equal(tokenAccount.amount, BigInt(2 * tokens));
-    const hxuiConfigAccount = await program.account.config.fetch(
-      hxuiConfigAddress,
-    );
+    const hxuiConfigAccount =
+      await program.account.config.fetch(hxuiConfigAddress);
     assert(
       hxuiConfigAccount.pricePerToken
         .mul(new BN(tokens))
@@ -988,7 +984,7 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
     const adminBalanceBefore = await getBalance(adminPubkey);
     const pollAccountBefore = await program.account.poll.fetch(pollAddress);
     await program.methods
-      .createCandidate(candidateName, candidateDescription, false, null)
+      .createCandidate(candidateName, candidateDescription, false)
       .accounts({ admin: adminPubkey })
       .signers([admin])
       .rpc();
@@ -1003,9 +999,8 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
       adminBalanceBefore - adminBalanceAfter,
       candidateAccountBalance,
     );
-    const candidateAccount = await program.account.candidate.fetch(
-      candidateAddress,
-    );
+    const candidateAccount =
+      await program.account.candidate.fetch(candidateAddress);
 
     const pollAccountAfter = await program.account.poll.fetch(pollAddress);
 
@@ -1045,7 +1040,7 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
       const name = "ABCD" + i;
       const description = "lorem ipsum";
       await program.methods
-        .createCandidate(name, description, i == 3 || i == 4 || i == 5, null)
+        .createCandidate(name, description, i == 3 || i == 4 || i == 5)
         .accounts({ admin: adminPubkey })
         .signers([admin])
         .rpc();
@@ -1101,7 +1096,7 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
       TOKEN_2022_PROGRAM_ID,
     );
     await program.methods
-      .voteCandidateWithHxuiLite(activeCandidates[0].name, new BN(votes))
+      .voteCandidateFree(activeCandidates[0].name, new BN(votes))
       .accounts({ owner: users[0].publicKey })
       .signers([users[0]])
       .rpc();
@@ -1187,9 +1182,8 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
           ],
           program.programId,
         );
-        const voteReceipt = await program.account.voteReceipt.fetch(
-          receiptAddress,
-        );
+        const voteReceipt =
+          await program.account.voteReceipt.fetch(receiptAddress);
 
         // Verifying the receipt.
         assert.equal(voteReceipt.id, candidateAccount.id);
@@ -1287,9 +1281,8 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
       for (let i = 0; i < activeCandidates.length; i++) {
         const candidateAddress = activeCandidates[i].address;
 
-        const candidate = await program.account.candidate.fetch(
-          candidateAddress,
-        );
+        const candidate =
+          await program.account.candidate.fetch(candidateAddress);
         if (candidate.candidateStatus.active) {
           if (
             expectedWinnerCandidateId == undefined ||
@@ -1437,7 +1430,7 @@ describe("Advance candidate testing", () => {
     async function voteANonActiveCandidate(nonActiveCandidateName: string) {
       try {
         await program.methods
-          .voteCandidateWithHxuiLite(nonActiveCandidateName, new BN(1))
+          .voteCandidateFree(nonActiveCandidateName, new BN(1))
           .accounts({
             owner: users[1].publicKey,
           })
@@ -1677,9 +1670,8 @@ describe("Advance candidate testing", () => {
       // );
 
       const vaultBalanceBefore = await getBalance(hxuiVaultAddress);
-      const receiptBalanceBefore = await connection.getBalance(
-        userReceiptAddress,
-      );
+      const receiptBalanceBefore =
+        await connection.getBalance(userReceiptAddress);
       const tokenAddress = getAssociatedTokenAddressSync(
         hxuiMintAddress,
         users[0].publicKey,
@@ -1699,9 +1691,8 @@ describe("Advance candidate testing", () => {
       const {
         value: { uiAmount: tokenBalanceAfter },
       } = await connection.getTokenAccountBalance(tokenAddress);
-      const receiptBalanceAfter = await connection.getBalance(
-        userReceiptAddress,
-      );
+      const receiptBalanceAfter =
+        await connection.getBalance(userReceiptAddress);
 
       assert(receiptBalanceAfter == 0);
       assert.equal(
@@ -2022,14 +2013,12 @@ describe("Advance candidate testing", () => {
         ],
         program.programId,
       );
-      const receiptAccountState = await program.account.voteReceipt.fetch(
-        userReceiptAddress,
-      );
+      const receiptAccountState =
+        await program.account.voteReceipt.fetch(userReceiptAddress);
 
       const vaultBalanceBefore = await getBalance(hxuiVaultAddress);
-      const receiptBalanceBefore = await connection.getBalance(
-        userReceiptAddress,
-      );
+      const receiptBalanceBefore =
+        await connection.getBalance(userReceiptAddress);
       const tokenAddress = getAssociatedTokenAddressSync(
         hxuiMintAddress,
         users[0].publicKey,
@@ -2053,9 +2042,8 @@ describe("Advance candidate testing", () => {
       const {
         value: { uiAmount: tokenBalanceAfter },
       } = await connection.getTokenAccountBalance(tokenAddress);
-      const receiptBalanceAfter = await connection.getBalance(
-        userReceiptAddress,
-      );
+      const receiptBalanceAfter =
+        await connection.getBalance(userReceiptAddress);
 
       assert(receiptBalanceAfter == 0);
       assert.equal(
@@ -2265,9 +2253,8 @@ describe("Advance candidate testing", () => {
       // );
 
       const vaultBalanceBefore = await getBalance(hxuiVaultAddress);
-      const receiptBalanceBefore = await connection.getBalance(
-        userReceiptAddress,
-      );
+      const receiptBalanceBefore =
+        await connection.getBalance(userReceiptAddress);
       const tokenAddress = getAssociatedTokenAddressSync(
         hxuiMintAddress,
         users[0].publicKey,
@@ -2346,9 +2333,8 @@ describe("Advance candidate testing", () => {
       const {
         value: { uiAmount: tokenBalanceAfter },
       } = await connection.getTokenAccountBalance(tokenAddress);
-      const receiptBalanceAfter = await connection.getBalance(
-        userReceiptAddress,
-      );
+      const receiptBalanceAfter =
+        await connection.getBalance(userReceiptAddress);
 
       assert(receiptBalanceAfter == 0);
       assert.equal(
