@@ -1,12 +1,14 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
-import { Hxui } from "../target/types/hxui";
+import { Hxui } from "../target/types/hxui.js";
 import {
   getMint,
   TOKEN_2022_PROGRAM_ID,
   getAssociatedTokenAddressSync,
   createAssociatedTokenAccountInstruction,
   getAccount,
+  unpackMint,
+  unpackAccount,
 } from "@solana/spl-token";
 import {
   PublicKey,
@@ -17,8 +19,6 @@ import {
 } from "@solana/web3.js";
 import assert from "assert";
 import bs58 from "bs58";
-import { off } from "cluster";
-import { connect } from "http2";
 const { BN } = anchor;
 
 const provider = anchor.AnchorProvider.env();
@@ -76,29 +76,6 @@ const [hxuiFreeTokensCounterAddress, hxuiFreeTokensCounterBump] =
     [Buffer.from("hxui_free_tokens_counter")],
     program.programId,
   );
-
-const createCandidate = async (
-  name: string,
-  description: string,
-  claimableIfWinner: boolean = true,
-  claimableBps: null | undefined | number = null,
-) => {
-  const fundAdminIxn = await program.methods
-    .fundAdminForCandidate()
-    .accounts({ admin })
-    .instruction();
-  const createAndIntialiseIxn = await program.methods
-    .createCandidate(name, description, claimableIfWinner, claimableBps)
-    .accounts({
-      admin,
-    })
-    .instruction();
-  const transactionMessage = new Transaction().add(
-    fundAdminIxn,
-    createAndIntialiseIxn,
-  );
-  await provider.sendAndConfirm(transactionMessage, [payer]);
-};
 
 const getRent = async (additionalSpace: number) => {
   return await connection.getMinimumBalanceForRentExemption(additionalSpace);
@@ -230,14 +207,19 @@ describe("1) initialise_dapp instruction testing", () => {
     assert(hxuiMintData.freezeAuthority === null);
 
     const hxuiLiteMint = await connection.getAccountInfo(hxuiLiteMintAddress);
-    assert.notEqual(hxuiMint, null, "HXUILite mint does not exist");
-
-    const hxuiLiteMintData = await getMint(
-      connection,
+    const hxuiLiteMintData = unpackMint(
       hxuiLiteMintAddress,
-      "confirmed",
+      hxuiLiteMint,
       TOKEN_2022_PROGRAM_ID,
     );
+    assert.notEqual(hxuiMint, null, "HXUILite mint does not exist");
+
+    // const hxuiLiteMintData = await getMint(
+    //   connection,
+    //   hxuiLiteMintAddress,
+    //   "confirmed",
+    //   TOKEN_2022_PROGRAM_ID,
+    // );
 
     // mint is owned by token 2022 program
     assert(hxuiLiteMint.owner.equals(TOKEN_2022_PROGRAM_ID));
@@ -826,13 +808,22 @@ describe("5) Buying HXUI tokens for users[0]", async () => {
       .rpc();
     const userBalanceAfter = await getBalance(users[0].publicKey);
 
-    await sleep(0.2);
-    const tokenAccount = await getAccount(
-      connection,
+    const tokenAccountInfoAfterPurchase = await connection.getAccountInfo(
       tokenAddress,
-      "confirmed",
+    );
+    await sleep(2);
+    const tokenAccount = unpackAccount(
+      tokenAddress,
+      tokenAccountInfoAfterPurchase,
       TOKEN_2022_PROGRAM_ID,
     );
+
+    // const tokenAccount = await getAccount(
+    //   connection,
+    //   tokenAddress,
+    //   "confirmed",
+    //   TOKEN_2022_PROGRAM_ID,
+    // );
 
     assert.equal(tokenAccount.amount, BigInt(tokens));
     const hxuiConfigAccount = await program.account.config.fetch(
@@ -2428,80 +2419,6 @@ describe("Advance candidate testing", () => {
   //     winner:[0(0),1(0,closed)],
   //     withdrawn:[1(0,closed),1(0,closed),2(0,closed)]
   //   }
-
-  // it("5.6) Cannot Withdraw a Non active candidate (eg. candidates[0]) ", async () => {
-  //   // Only an active candidate can be withdrawn.
-  //   try {
-  //     await program.methods
-  //       .withdrawCandidate(newCandidates.withdrawn[0].name)
-  //       .accounts({ admin: adminPubkey })
-  //       .signers([admin])
-  //       .rpc();
-  //   } catch ({
-  //     error: {
-  //       errorCode: { code },
-  //     },
-  //   }) {
-  //     assert.strictEqual(code, "OnlyActiveCandidateCanBeWithdrawn");
-  //   }
-  // });
-
-  //   // usersHXUITokenBalance = [0,0,0]
-  //   // usersHXUILiteTokenBalance = [2,4,4]
-  //   // candidatesType[WINNER(unclaimable), withdrawn, active, WINNER(claimable)]
-  //   // candidatesVotes[2(1 receipt),0,0,1(1 receipt)]
-
-  //   // usersHXUITokenBalance = [0,0,0]
-  //   // usersHXUILiteTokenBalance = [2,4,4]
-  //   // candidatesType[WINNER(unclaimable), withdrawn, active, WINNER(claimable)]
-  //   // candidatesVotes[2(1 receipt),0,0,1(1 receipt)]
-
-  //   it("Attempt to close a Withdrawn candidate (candidates[1]) and a Claimable Winner candidate (candidates[3]) before opening a withdraw window. FAILS", async () => {
-  //     try {
-  //       await program.methods
-  //         .closeCandidate(candidates[1].name)
-  //         .accounts({ admin: adminPubkey })
-  //         .signers([admin])
-  //         .rpc();
-  //     } catch ({
-  //       error: {
-  //         errorCode: { code },
-  //       },
-  //     }) {
-  //       assert.equal(code, "OpenWithdrawWindowFirst", "a");
-  //     }
-
-  //     const claimableWinnerCandidate = await program.account.candidate.fetch(
-  //       candidates[3].address,
-  //     );
-  //     assert(
-  //       claimableWinnerCandidate.claimableIfWinner == true,
-  //       "Not a claimable winner",
-  //     );
-  //     assert(
-  //       claimableWinnerCandidate.candidateStatus.claimableWinner,
-  //       "Not a claimable winner",
-  //     );
-
-  //     try {
-  //       await program.methods
-  //         .closeCandidate(candidates[3].name)
-  //         .accounts({ admin: adminPubkey })
-  //         .signers([admin])
-  //         .rpc();
-  //     } catch ({
-  //       error: {
-  //         errorCode: { code },
-  //       },
-  //     }) {
-  //       assert.equal(code, "OpenWithdrawWindowFirst", "b");
-  //     }
-  //   });
-
-  //   // usersHXUITokenBalance = [0,0,0]
-  //   // usersHXUILiteTokenBalance = [2,4,4]
-  //   // candidatesType[WINNER(unclaimable), withdrawn, active, WINNER(claimable)]
-  //   // candidatesVotes[2(1 receipt),0,0,1(1 receipt)]
 });
 
 // describe("temp", () => {
@@ -2522,549 +2439,30 @@ describe("Advance candidate testing", () => {
 //     console.log(!!account.myEnum.tuesday == true);
 //   });
 // });
-
-// describe("5) vote_candidate instruction testing", () => {
-//   const name = "Lorem ipsum dolor sit amet, 4321";
-
-//   const [candidateAddress] = PublicKey.findProgramAddressSync(
-//     [Buffer.from("hxui_candidate"), Buffer.from(name)],
-//     program.programId,
-//   );
-//   const [candidateVoterAddress] = PublicKey.findProgramAddressSync(
-//     [Buffer.from("hxui_candidate_component_voters"), Buffer.from(name)],
-//     program.programId,
-//   );
-//   const tokenOwner = new Keypair();
-//   const mintTokens = 2;
-//   const ownerTokenAccountAddress = getAssociatedTokenAddressSync(
-//     hxuiMintAddress,
-//     tokenOwner.publicKey,
-//     false,
-//     TOKEN_2022_PROGRAM_ID,
-//   );
-
-//   const candidateAccountSpace = 8 + 331;
-//   const candidateVotersAccountSpace = 8 + 5;
-//   let predictedExtraReallocationRent: number;
-//   before(async () => {
-//     const createCandidate = async (
-//       name: string,
-//       description: string,
-//       claimableIfWinner: boolean = true,
-//       claimableBps: null | undefined | number = null,
-//     ) => {
-//       const fundAdminIxn = await program.methods
-//         .fundAdminForCandidate()
-//         .accounts({ admin })
-//         .instruction();
-//       const createAndIntialiseIxn = await program.methods
-//         .createCandidate(name, description, claimableIfWinner, claimableBps)
-//         .accounts({
-//           admin,
-//         })
-//         .instruction();
-//       const transactionMessage = new Transaction().add(
-//         fundAdminIxn,
-//         createAndIntialiseIxn,
-//       );
-//       await provider.sendAndConfirm(transactionMessage, [payer]);
-//     };
-
-//     const description =
-//       "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in volu..";
-//     assert(name.length <= 32);
-//     assert(description.length <= 280);
-
-//     await airdrop(tokenOwner.publicKey, LAMPORTS_PER_SOL);
-//     const tokenOwnerBalance = await connection.getBalance(tokenOwner.publicKey);
-//     assert.equal(tokenOwnerBalance, LAMPORTS_PER_SOL);
-
-//     await program.methods
-//       .buyPaidTokens(new BN(mintTokens))
-//       .accounts({
-//         owner: tokenOwner.publicKey,
-//       })
-//       .signers([tokenOwner])
-//       .rpc();
-
-//     const {
-//       value: { uiAmount: ownerTokenAccountBalance },
-//     } = await connection.getTokenAccountBalance(ownerTokenAccountAddress);
-
-//     assert.equal(ownerTokenAccountBalance, mintTokens);
-//     const vaultAccountBalanceBefore = await connection.getBalance(
-//       hxuiVaultAddress,
-//     );
-//     const zeroSpaceRent = await connection.getMinimumBalanceForRentExemption(0);
-//     assert(vaultAccountBalanceBefore >= zeroSpaceRent);
-//     const candidateAccountMinimumBalance =
-//       await connection.getMinimumBalanceForRentExemption(candidateAccountSpace);
-
-//     const candidateVotersAccountMinimumBalance =
-//       await connection.getMinimumBalanceForRentExemption(
-//         candidateVotersAccountSpace,
-//       );
-
-//     await sleep(0.25);
-//     const hxuiMintDataAfter = await getMint(
-//       connection,
-//       hxuiMintAddress,
-//       "confirmed",
-//       TOKEN_2022_PROGRAM_ID,
-//     );
-
-//     const hxuiConfigAccount = await program.account.config.fetch(
-//       hxuiConfigAddress,
-//     );
-
-//     const minimumVaultBalanceToRecordVoters =
-//       (await connection.getMinimumBalanceForRentExemption(
-//         Math.floor(
-//           Number(hxuiMintDataAfter.supply) /
-//             hxuiConfigAccount.tokensPerVote.toNumber(),
-//         ) * 40,
-//       )) - (await connection.getMinimumBalanceForRentExemption(0));
-//     predictedExtraReallocationRent = minimumVaultBalanceToRecordVoters;
-//     if (
-//       vaultAccountBalanceBefore <
-//       candidateAccountMinimumBalance +
-//         candidateVotersAccountMinimumBalance +
-//         minimumVaultBalanceToRecordVoters
-//     ) {
-//       await airdrop(hxuiVaultAddress, LAMPORTS_PER_SOL);
-//       const vaultAccountBalanceAfter = await connection.getBalance(
-//         hxuiVaultAddress,
-//       );
-//       assert(vaultAccountBalanceAfter >= LAMPORTS_PER_SOL);
-//     }
-
-//     await createCandidate(name, description);
-
-//     const candidateAccountBalance = await connection.getBalance(
-//       candidateAddress,
-//     );
-//     //candidate account balances equals the minimum rent exemption;
-//     assert.equal(candidateAccountBalance, candidateAccountMinimumBalance);
-
-//     const candidateVotersAccountBalance = await connection.getBalance(
-//       candidateVoterAddress,
-//     );
-
-//     //candidate_voters account balances equals the minimum rent exemption;
-//     assert.equal(
-//       candidateVotersAccountBalance,
-//       candidateVotersAccountMinimumBalance,
-//     );
-//   });
-//   it("5.1) Vote candidate with 1 vote and Record the voter and its votes", async () => {
-//     const candidateAccountBefore = await program.account.candidate.fetch(
-//       candidateAddress,
-//     );
-
-//     const {
-//       value: { uiAmount: ownerTokenAccountBalanceBeforeVoting },
-//     } = await connection.getTokenAccountBalance(ownerTokenAccountAddress);
-
-//     const tokenOwnerBalanceBefore = await connection.getBalance(
-//       tokenOwner.publicKey,
-//     );
-//     const payerBalanceBefore = await connection.getBalance(payer.publicKey);
-
-//     const candidateVoterAccountBefore = await connection.getAccountInfo(
-//       candidateVoterAddress,
-//     );
-
-//     const actualCandidateVotersAccountBeforeBalance =
-//       candidateVoterAccountBefore.lamports;
-//     const votes = Math.floor(mintTokens / 2);
-//     await program.methods
-//       .voteCandidate(name, new BN(votes))
-//       .accounts({
-//         owner: tokenOwner.publicKey,
-//       })
-//       .signers([tokenOwner])
-//       .rpc();
-
-//     const payerBalanceAfter = await connection.getBalance(payer.publicKey);
-//     const tokenOwnerBalanceAfter = await connection.getBalance(
-//       tokenOwner.publicKey,
-//     );
-
-//     //exactly 40 bytes worth of lamports moved.
-//     assert.equal(
-//       tokenOwnerBalanceBefore - tokenOwnerBalanceAfter,
-//       predictedExtraReallocationRent,
-//     );
-
-//     //network fees paid by anchor wallet.
-//     assert.notEqual(payerBalanceAfter, payerBalanceBefore);
-
-//     const candidateVoterAccountAfter = await connection.getAccountInfo(
-//       candidateVoterAddress,
-//     );
-
-//     const actualCandidateVotersAccountAfterBalance =
-//       candidateVoterAccountAfter.lamports;
-
-//     const expectedCandidateVotersAccountAfterBalance =
-//       await connection.getMinimumBalanceForRentExemption(
-//         candidateVotersAccountSpace + 40,
-//       );
-
-//     assert.equal(
-//       actualCandidateVotersAccountAfterBalance -
-//         actualCandidateVotersAccountBeforeBalance,
-//       tokenOwnerBalanceBefore - tokenOwnerBalanceAfter,
-//     );
-
-//     // this basically is the test if the supply is distributed in 2 tokens per account and what if all the users vote..then the predictedExtraReallocationRent should be present in the vault along with exempt rent of vault.
-//     assert.equal(
-//       actualCandidateVotersAccountAfterBalance,
-//       predictedExtraReallocationRent +
-//         actualCandidateVotersAccountBeforeBalance,
-//     );
-//     const candidateAccountAfter = await program.account.candidate.fetch(
-//       candidateAddress,
-//     );
-//     assert(
-//       candidateAccountAfter.numberOfVotes.eq(
-//         candidateAccountBefore.numberOfVotes.add(new BN(votes)),
-//       ),
-//     );
-
-//     const candidateVotersAccountAfter =
-//       await program.account.candidateVoters.fetch(candidateVoterAddress);
-
-//     const ownerInVoterRecord = candidateVotersAccountAfter.voters.find(
-//       ({ voter }) => voter.equals(tokenOwner.publicKey),
-//     );
-
-//     assert(ownerInVoterRecord.voter.equals(tokenOwner.publicKey));
-//     assert(ownerInVoterRecord.votes.eq(new BN(votes)));
-//     const {
-//       value: { uiAmount: ownerTokenAccountBalanceAfterVoting },
-//     } = await connection.getTokenAccountBalance(ownerTokenAccountAddress);
-
-//     assert.equal(
-//       ownerTokenAccountBalanceAfterVoting,
-//       ownerTokenAccountBalanceBeforeVoting - mintTokens,
-//     );
-//   });
-// });
-// describe("5) create_candidate instruction testing", () => {
-//   const [hxuiVaultAddress] = PublicKey.findProgramAddressSync(
-//     [Buffer.from("hxui_vault")],
-//     program.programId,
-//   );
-
-//   const [hxuiMintAddress] = PublicKey.findProgramAddressSync(
-//     [Buffer.from("hxui_mint")],
-//     program.programId,
-//   );
-
-//   const description =
-//     "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in volu..";
-
-//   it("5.1) Create and initialise the candidate and candidate_voters account where vault has just enough balance and supply is hxui_mint = 0.", async () => {
-//     const name = "Lorem ipsum dolor sit amet, 1234";
-//     const [candidateAddress, candidateBump] = PublicKey.findProgramAddressSync(
-//       [Buffer.from("hxui_candidate"), Buffer.from(name)],
-//       program.programId,
-//     );
-
-//     const [candidateVoterAddress, candidateVoterBump] =
-//       PublicKey.findProgramAddressSync(
-//         [Buffer.from("hxui_candidate_component_voters"), Buffer.from(name)],
-//         program.programId,
-//       );
-
-//     // balance = rent minimum
-//     const vaultAccountBalance = await connection.getBalance(hxuiVaultAddress);
-
-//     // const zeroSpaceRent = await connection.getMinimumBalanceForRentExemption(0);
-//     // assert.equal(vaultAccountBalance, zeroSpaceRent, "Mismatch vault balance.");
-//     const candidateAccountMinimumBalance =
-//       await connection.getMinimumBalanceForRentExemption(8 + 331);
-
-//     const candidateVotersAccountMinimumBalance =
-//       await connection.getMinimumBalanceForRentExemption(8 + 5);
-
-//     const hxuiMintData = await getMint(
-//       connection,
-//       hxuiMintAddress,
-//       "confirmed",
-//       TOKEN_2022_PROGRAM_ID,
-//     );
-//     const [hxuiConfigAddress] = PublicKey.findProgramAddressSync(
-//       [Buffer.from("hxui_config")],
-//       program.programId,
-//     );
-//     const hxuiConfigAccount = await program.account.config.fetch(
-//       hxuiConfigAddress,
-//     );
-
-//     const minimumVaultBalanceToRecordVoters =
-//       (await connection.getMinimumBalanceForRentExemption(
-//         Math.floor(
-//           Number(hxuiMintData.supply) /
-//             hxuiConfigAccount.tokensPerVote.toNumber(),
-//         ) * 40,
-//       )) - (await connection.getMinimumBalanceForRentExemption(0));
-
-//     //funding vault with just enough balance. anything less would cause Insufficient funds error.
-//     await airdrop(
-//       hxuiVaultAddress,
-//       candidateAccountMinimumBalance +
-//         candidateVotersAccountMinimumBalance +
-//         minimumVaultBalanceToRecordVoters,
-//     );
-//     const vaultAccountBalanceBeforeCandidateCreation =
-//       await connection.getBalance(hxuiVaultAddress);
-
-//     //airdropped lamports equal to creation of a candidate.
-//     assert.equal(
-//       vaultAccountBalanceBeforeCandidateCreation,
-//       vaultAccountBalance +
-//         candidateAccountMinimumBalance +
-//         candidateVotersAccountMinimumBalance +
-//         minimumVaultBalanceToRecordVoters,
-//     );
-
-//     const adminBalanceBefore = await connection.getBalance(admin);
-//     assert(description.length <= 280);
-
-//     await createCandidate(name, description);
-
-//     const adminBalanceAfter = await connection.getBalance(admin);
-//     //admin as mediator, network fee of 5000 lamports bared by the admin.
-//     assert.equal(adminBalanceAfter, adminBalanceBefore - 5000);
-
-//     const vaultAccountBalanceAfterCandidateCreation =
-//       await connection.getBalance(hxuiVaultAddress);
-//     // exempted rent of candidate and candidate_voters.... Now has enough to record voters
-//     // in candidate voters.
-//     assert.equal(
-//       vaultAccountBalanceAfterCandidateCreation,
-//       vaultAccountBalance + minimumVaultBalanceToRecordVoters,
-//     );
-
-//     const candidateAccountBalance = await connection.getBalance(
-//       candidateAddress,
-//     );
-//     //candidate account balances equals the minimum rent exemption;
-//     assert.equal(candidateAccountBalance, candidateAccountMinimumBalance);
-
-//     const candidateVotersAccountBalance = await connection.getBalance(
-//       candidateVoterAddress,
-//     );
-
-//     //candidate_voters account balances equals the minimum rent exemption;
-//     assert.equal(
-//       candidateVotersAccountBalance,
-//       candidateVotersAccountMinimumBalance,
-//     );
-
-//     //verifying the accounts state
-//     const candidateAccount = await program.account.candidate.fetch(
-//       candidateAddress,
-//     );
-
-//     assert.equal(candidateAccount.name, name);
-//     assert.equal(candidateAccount.description, description);
-//     assert.equal(candidateAccount.isWinner, false);
-//     assert.equal(candidateAccount.canBeWinner, true);
-//     assert.equal(candidateAccount.claimableBasisPointsIfWinner, 5000),
-//       assert.equal(candidateAccount.claimableIfWinner, true);
-//     assert.equal(candidateAccount.bump, candidateBump);
-
-//     const candidateVotersAccount = await program.account.candidateVoters.fetch(
-//       candidateVoterAddress,
-//     );
-
-//     assert.equal(candidateVotersAccount.bump, candidateVoterBump);
-//     assert.equal(candidateVotersAccount.voters.length, 0);
-//   });
-
-//   // it("5.2) Create and initialise the candidate and candidate_voters account where vault has just enough balance and supply is hxui_mint > 0.", async () => {
-//   //   const name = "Lorem ipsum dolor sit amet";
-//   //   const [candidateAddress, candidateBump] = PublicKey.findProgramAddressSync(
-//   //     [Buffer.from("hxui_candidate"), Buffer.from(name)],
-//   //     program.programId,
-//   //   );
-
-//   //   const [candidateVoterAddress, candidateVoterBump] =
-//   //     PublicKey.findProgramAddressSync(
-//   //       [Buffer.from("hxui_candidate_component_voters"), Buffer.from(name)],
-//   //       program.programId,
-//   //     );
-
-//   //   const hxuiMintDataBeforeMinting = await getMint(
-//   //     connection,
-//   //     hxuiMintAddress,
-//   //     "confirmed",
-//   //     TOKEN_2022_PROGRAM_ID,
-//   //   );
-
-//   //   const tokenHolders: Keypair[] = [];
-//   //   const tokenHoldersLength = 5;
-//   //   for (let i = 0; i < tokenHoldersLength; i++) {
-//   //     const tokenHolder = new Keypair();
-//   //     await airdrop(tokenHolder.publicKey, LAMPORTS_PER_SOL);
-//   //     tokenHolders.push(tokenHolder);
-//   //     const walletBalance = await connection.getBalance(
-//   //       tokenHolders[i].publicKey,
-//   //     );
-//   //     assert.equal(walletBalance, LAMPORTS_PER_SOL);
-//   //   }
-//   //   const vaultAccountBalanceBeforeTokenPurcase = await connection.getBalance(
-//   //     hxuiVaultAddress,
-//   //   );
-
-//   //   for (let i = 0; i < tokenHoldersLength; i++) {
-//   //     await program.methods
-//   //       .buyPaidTokens(new BN(2))
-//   //       .accounts({
-//   //         owner: tokenHolders[i].publicKey,
-//   //       })
-//   //       .signers([tokenHolders[i]])
-//   //       .rpc();
-
-//   //     const associatedTokenAddress = getAssociatedTokenAddressSync(
-//   //       hxuiMintAddress,
-//   //       tokenHolders[i].publicKey,
-//   //       false,
-//   //       TOKEN_2022_PROGRAM_ID,
-//   //     );
-//   //     const {
-//   //       value: { uiAmount: tokenAccountBalance },
-//   //     } = await connection.getTokenAccountBalance(associatedTokenAddress);
-//   //     assert.equal(tokenAccountBalance, 2);
-//   //   }
-
-//   //   // balance = rent minimum + tokensLength*2*0.001 * Lamports_per_sol
-//   //   const vaultAccountBalanceAfterTokenPurcase = await connection.getBalance(
-//   //     hxuiVaultAddress,
-//   //   );
-
-//   //   await sleep(0.5); //wait for data to be indexed on-chain...
-//   //   const hxuiMintDataAfterMinting = await getMint(
-//   //     connection,
-//   //     hxuiMintAddress,
-//   //     "confirmed",
-//   //     TOKEN_2022_PROGRAM_ID,
-//   //   );
-
-//   //   assert.equal(
-//   //     hxuiMintDataAfterMinting.supply,
-//   //     BigInt(tokenHoldersLength * 2) + hxuiMintDataBeforeMinting.supply,
-//   //     "Mismatch supply",
-//   //   );
-
-//   //   const tokensMinted = Number(
-//   //     hxuiMintDataAfterMinting.supply - hxuiMintDataBeforeMinting.supply,
-//   //   );
-//   //   assert.equal(
-//   //     vaultAccountBalanceAfterTokenPurcase,
-//   //     vaultAccountBalanceBeforeTokenPurcase +
-//   //       tokensMinted * pricePerToken.toNumber(),
-//   //   );
-
-//   //   const candidateAccountMinimumBalance =
-//   //     await connection.getMinimumBalanceForRentExemption(8 + 331);
-
-//   //   const candidateVotersAccountMinimumBalance =
-//   //     await connection.getMinimumBalanceForRentExemption(8 + 5);
-
-//   //   const [hxuiConfigAddress] = PublicKey.findProgramAddressSync(
-//   //     [Buffer.from("hxui_config")],
-//   //     program.programId,
-//   //   );
-//   //   const hxuiConfigAccount = await program.account.config.fetch(
-//   //     hxuiConfigAddress,
-//   //   );
-
-//   //   const minimumVaultBalanceToRecordVoters =
-//   //     (await connection.getMinimumBalanceForRentExemption(
-//   //       Math.floor(
-//   //         Number(hxuiMintDataAfterMinting.supply) /
-//   //           hxuiConfigAccount.tokensPerVote.toNumber(),
-//   //       ) * 40,
-//   //     )) - (await connection.getMinimumBalanceForRentExemption(0));
-
-//   //   const zeroSpaceRent = await connection.getMinimumBalanceForRentExemption(0);
-
-//   //   //funding vault with just enough balance. anything less would cause Insufficient funds error.
-//   //   await airdrop(
-//   //     hxuiVaultAddress,
-//   //     candidateAccountMinimumBalance +
-//   //       candidateVotersAccountMinimumBalance +
-//   //       minimumVaultBalanceToRecordVoters,
-//   //   );
-//   //   const vaultAccountBalanceBeforeCandidateCreation =
-//   //     await connection.getBalance(hxuiVaultAddress);
-
-//   //   //airdropped lamports equal to creation of a candidate.
-//   //   assert.equal(
-//   //     vaultAccountBalanceBeforeCandidateCreation,
-//   //     vaultAccountBalance +
-//   //       candidateAccountMinimumBalance +
-//   //       candidateVotersAccountMinimumBalance +
-//   //       minimumVaultBalanceToRecordVoters,
-//   //   );
-
-//   //   // const adminBalanceBefore = await connection.getBalance(admin);
-//   //   // assert(description.length <= 280);
-
-//   //   // await createCandidate(name, description);
-
-//   //   // const adminBalanceAfter = await connection.getBalance(admin);
-//   //   // //admin as mediator, network fee of 5000 lamports bared by the admin.
-//   //   // assert.equal(adminBalanceAfter, adminBalanceBefore - 5000);
-
-//   //   // const vaultAccountBalanceAfterCandidateCreation =
-//   //   //   await connection.getBalance(hxuiVaultAddress);
-//   //   // // exempted rent of candidate and candidate_voters.... Now has enough to record voters
-//   //   // // in candidate voters.
-//   //   // assert.equal(
-//   //   //   vaultAccountBalanceAfterCandidateCreation,
-//   //   //   vaultAccountBalance + minimumVaultBalanceToRecordVoters,
-//   //   // );
-
-//   //   // const candidateAccountBalance = await connection.getBalance(
-//   //   //   candidateAddress,
-//   //   // );
-//   //   // //candidate account balances equals the minimum rent exemption;
-//   //   // assert.equal(candidateAccountBalance, candidateAccountMinimumBalance);
-
-//   //   // const candidateVotersAccountBalance = await connection.getBalance(
-//   //   //   candidateVoterAddress,
-//   //   // );
-
-//   //   // //candidate_voters account balances equals the minimum rent exemption;
-//   //   // assert.equal(
-//   //   //   candidateVotersAccountBalance,
-//   //   //   candidateVotersAccountMinimumBalance,
-//   //   // );
-
-//   //   // //verifying the accounts state
-//   //   // const candidateAccount = await program.account.candidate.fetch(
-//   //   //   candidateAddress,
-//   //   // );
-
-//   //   // assert.equal(candidateAccount.name, name);
-//   //   // assert.equal(candidateAccount.description, description);
-//   //   // assert.equal(candidateAccount.isWinner, false);
-//   //   // assert.equal(candidateAccount.isVotable, true);
-//   //   // assert.equal(candidateAccount.bump, candidateBump);
-
-//   //   // const candidateVotersAccount = await program.account.candidateVoters.fetch(
-//   //   //   candidateVoterAddress,
-//   //   // );
-
-//   //   // assert.equal(candidateVotersAccount.bump, candidateVoterBump);
-//   //   // assert.equal(candidateVotersAccount.voters.length, 0);
-//   // });
-// });
+describe("6)Safe withdrawl from the vault ixn testing..", () => {
+  async function getMinimumVaultBalance() {
+    const mint = await getMint(
+      connection,
+      hxuiMintAddress,
+      "confirmed",
+      TOKEN_2022_PROGRAM_ID,
+    );
+
+    const voteReceiptRent = await getRent(21);
+    const minimumVaultBalance =
+      (await getRent(0)) + Math.floor(Number(mint.supply)) * voteReceiptRent;
+    return minimumVaultBalance;
+  }
+  it("Attempt withdrawl from non-admin");
+  it("Attempt to withdraw amount greater than the vault can afford, must FAIL");
+  it(
+    "Withdraw maximum amount possible from the vault WITHOUT explicitly passing the amount.",
+  );
+  it("Withdraw maximum amount possible from the vault");
+  it(
+    "Withdraw maximum amount possible from the vault WITH explicitly passing the amount.",
+  );
+});
 
 // describe("6) safe_withdraw_from_vault instruction testing", () => {
 //   let minimumLamportsToExemptRentAndRecordVoters: number;

@@ -71,9 +71,9 @@ pub fn draw_winner<'info>(ctx:Context<'_, '_, 'info, 'info,PickWinner<'_>>)->Res
         instructions::open_claimable_window::set_closable_time(ctx,until)
     }
    
-    pub fn fund_admin_for_candidate(ctx:Context<FundAdminForCandidate>)->Result<()>{
-        instructions::fund_admin_for_candidate::transfer_rent_to_admin(ctx)
-    }
+    // pub fn fund_admin_for_candidate(ctx:Context<FundAdminForCandidate>)->Result<()>{
+    //     instructions::fund_admin_for_candidate::transfer_rent_to_admin(ctx)
+    // }
 
      pub fn buy_paid_tokens(ctx:Context<BuyPaidTokens>,amount:u64)->Result<()>{
         instructions::buy_paid_tokens::payment(&ctx,&amount)?;
