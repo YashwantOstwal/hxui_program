@@ -87,7 +87,7 @@ pub fn draw_winner<'info>(ctx:Context<'_, '_, 'info, 'info,PickWinner<'_>>)->Res
         instructions::vote_candidate::vote(ctx,votes)
     }
 
-    pub fn vote_candidate_free(ctx:Context<VoteCandidateWithHxuiLite>,_name:String,votes:u64)->Result<()>{
+    pub fn vote_candidate_with_hxui_lite(ctx:Context<VoteCandidateWithHxuiLite>,_name:String,votes:u64)->Result<()>{
         instructions::vote_candidate_with_hxui_lite::vote_with_hxui_lite(ctx,votes)
     }
     

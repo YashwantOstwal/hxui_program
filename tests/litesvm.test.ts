@@ -1432,7 +1432,10 @@ function getVoteCandidateWithHxuiLiteInstruction(
   accounts: Record<"owner", PublicKey>,
   instructionArgs: { _name: string; votes: anchor.BN },
 ) {
-  const data = coder.instruction.encode("vote_candidate_free", instructionArgs);
+  const data = coder.instruction.encode(
+    "vote_candidate_with_hxui_lite",
+    instructionArgs,
+  );
 
   const tokenAddress = getHxuiLiteTokenAddress(accounts.owner);
   const mintAddress = getPda(SEEDS.hxuiLiteMint).address;
