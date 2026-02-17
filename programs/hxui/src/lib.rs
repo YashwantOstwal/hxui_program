@@ -103,12 +103,15 @@ pub fn draw_winner<'info>(ctx:Context<'_, '_, 'info, 'info,PickWinner<'_>>)->Res
         instructions::clear_receipt::close_receipt_account(ctx)
     }
 
-    pub fn create_new_account(ctx:Context<CreateNewAccount>)->Result<()>{
+   pub fn create_new_account(ctx:Context<CreateNewAccount>)->Result<()>{
         instructions::create_new_account::create(ctx)
-}
-pub fn initialise_account(ctx:Context<InitialiseNewAccount>)->Result<()>{
-    ctx.accounts.new_account.id = 5;
-    Ok(())
-}}
+    }
 
+  pub fn temp(ctx:Context<Temp>)->Result<()>{
+        instructions::create_new_account::reset(ctx)
+    }
+
+
+
+}
 

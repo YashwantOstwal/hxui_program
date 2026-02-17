@@ -1,7 +1,7 @@
     use anchor_lang::system_program::{CreateAccount, create_account};
 
 use anchor_lang::prelude::*;
-use crate::{Schema};
+use crate::{ANCHOR_DISCRIMINATOR, Schema};
 #[derive(Accounts)]
 
 pub struct CreateNewAccount<'info>{
@@ -12,37 +12,55 @@ pub struct CreateNewAccount<'info>{
     )]
     pub vault:SystemAccount<'info>,
 
+    /// CHECK: The validation is done while processing the ixn.
     #[account(
         mut,
         seeds = [b"hxui_new_account"],
         bump,
     )]
-    pub new_account:SystemAccount<'info>,
+    pub receipt:UncheckedAccount<'info>,
 
 
     pub system_program:Program<'info,System>,
 }
 pub  fn create(ctx:Context<CreateNewAccount>)->Result<()>{
-let new_account_info = ctx.accounts.new_account.to_account_info();
-    let pda_seeds:&[&[u8]] = &[b"hxui_new_account",&[ctx.bumps.new_account]];
+
+    if ctx.accounts.receipt.owner == ctx.program_id {
+    let receipt = &mut ctx.accounts.receipt;
+
+    let mut data = receipt.try_borrow_mut_data()?;
+        
+        // Use Anchor's internal helper to deserialize 
+        // We wrap in a scope or use a closure to ensure the borrow is dropped if needed
+        let mut account_data: Schema = AccountDeserialize::try_deserialize(&mut &data[..])?;
+        
+        account_data.votes+=1;
+
+        // Write the updated struct back into the account data
+        account_data.try_serialize(&mut &mut data[..])?;
+    }else {
+    let receipt = &mut ctx.accounts.receipt;
+
+    let pda_seeds:&[&[u8]] = &[b"hxui_new_account",&[ctx.bumps.receipt]];
     let vault_seeds:&[&[u8]] = &[b"hxui_vault",&[ctx.bumps.vault]];
 
     let pda_signer_seeds = [&pda_seeds[..],&vault_seeds[..]];
         let system_program = &mut ctx.accounts.system_program;
         let cpi_context = CpiContext::new(system_program.to_account_info(),CreateAccount {
             from:ctx.accounts.vault.to_account_info(),
-            to:new_account_info.clone()
+            to:receipt.to_account_info()
         }).with_signer(&pda_signer_seeds);
 
-        let space = 8 + Schema::INIT_SPACE ;
+
+        let space = ANCHOR_DISCRIMINATOR + Schema::INIT_SPACE ;
         let rent = (Rent::get()?).minimum_balance(space);
         create_account(cpi_context, rent, space as u64, &ctx.program_id)?;
 
-         let mut data = new_account_info.try_borrow_mut_data()?;
+         let mut data = receipt.try_borrow_mut_data()?;
     
     // Create an instance of your Schema
-    let schema_data = Schema {
-        id: 123, // Set your ID here
+    let state = Schema {
+        id:7,votes:0 // Set your ID here
     };
 
     // Write the 8-byte discriminator
@@ -50,14 +68,31 @@ let new_account_info = ctx.accounts.new_account.to_account_info();
     data[..8].copy_from_slice(&discriminator);
 
     // Serialize the struct into the remaining space (starting at index 8)
-    let mut space = &mut data[8..];
-    schema_data.serialize(&mut space)?;
+    state.serialize(&mut &mut data[8..])?;
+    }
+
         Ok(())
 }
 
 
 
 
+pub  fn reset(ctx:Context<Temp>)->Result<()>{
+    let new_account = &mut ctx.accounts.new_account;
+    new_account.votes-= 0;
+    Ok(())
+}
+
+#[derive(Accounts)]
+
+pub struct Temp<'info>{
+    #[account(
+        mut,
+        seeds = [b"hxui_new_account"],
+        bump,
+    )]
+    pub new_account:Account<'info,Schema>,
+}
 
 
 
@@ -65,7 +100,7 @@ let new_account_info = ctx.accounts.new_account.to_account_info();
 
 pub struct InitialiseNewAccount<'info>{
  #[account(
-        mut)]
+mut)]
     pub admin:Signer<'info>,
 
     #[account(

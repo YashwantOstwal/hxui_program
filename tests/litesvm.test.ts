@@ -927,6 +927,60 @@ describe("5) Buying HXUI tokens for users[0]", async () => {
         .eq(new anchor.BN(usersBalanceBefore - usersBalanceAfter)),
     );
   });
+  const [newAccountAddress] = PublicKey.findProgramAddressSync(
+    [Buffer.from("hxui_new_account")],
+    programId,
+  );
+  it("Making the vault pay the rent", () => {
+    svm.airdrop(getPda(SEEDS.hxuiVault).address, BigInt(LAMPORTS_PER_SOL));
+    const data = coder.instruction.encode("create_new_account", {});
+    const ixn = new TransactionInstruction({
+      programId,
+      keys: [
+        {
+          pubkey: getPda(SEEDS.hxuiVault).address,
+          isSigner: false,
+          isWritable: true,
+        },
+        { pubkey: newAccountAddress, isSigner: false, isWritable: true },
+        { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false },
+      ],
+      data,
+    });
+    const vaultBalanceBefore = svm.getBalance(getPda(SEEDS.hxuiVault).address);
+    sendTransaction([ixn, ixn, ixn], [], { logIfFailed: true });
+    const vaultBalanceAfter = svm.getBalance(getPda(SEEDS.hxuiVault).address);
+
+    const newAccountInfo = svm.getAccount(newAccountAddress);
+    console.log(newAccountInfo);
+    console.log(
+      vaultBalanceBefore - vaultBalanceAfter,
+      newAccountInfo.lamports,
+    );
+    const newAccountData = coder.accounts.decode(
+      "Schema",
+      Buffer.from(newAccountInfo.data),
+    );
+    console.log(newAccountData);
+  });
+
+  it("Reset the account", () => {
+    const data = coder.instruction.encode("temp", {});
+    const ixn = new TransactionInstruction({
+      programId,
+      keys: [{ pubkey: newAccountAddress, isSigner: false, isWritable: true }],
+      data,
+    });
+    sendTransaction([ixn, ixn], [], { logIfFailed: true });
+
+    const newAccountInfo = svm.getAccount(newAccountAddress);
+    console.log(newAccountInfo);
+    const newAccountData = coder.accounts.decode(
+      "Schema",
+      Buffer.from(newAccountInfo.data),
+    );
+    console.log(newAccountData);
+  });
 });
 
 //  users[0] has 14 HXUI tokens
