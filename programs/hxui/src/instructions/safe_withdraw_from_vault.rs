@@ -5,7 +5,7 @@ use anchor_spl::{
 
 
 
-use crate::{Config, CustomError, VoteReceipt};
+use crate::{ANCHOR_DISCRIMINATOR, Config, CustomError, VoteReceipt};
 #[derive(Accounts)]
 pub struct SafeWithdrawFromVault<'info>{
     #[account(mut)]
@@ -47,7 +47,7 @@ pub fn transfer_to_admin(ctx:Context<SafeWithdrawFromVault>,amount:Option<u64>)-
         let signer_seeds: [&[&[u8]]; 1] = [&seeds[..]];
 
 
-        let minimum_vault_balance = rent.minimum_balance(0) + hxui_mint.supply.div_euclid(ctx.accounts.hxui_config.tokens_per_vote) * rent.minimum_balance(VoteReceipt::INIT_SPACE);
+        let minimum_vault_balance = rent.minimum_balance(0) + hxui_mint.supply.div_euclid(ctx.accounts.hxui_config.tokens_per_vote) * rent.minimum_balance(VoteReceipt::INIT_SPACE + ANCHOR_DISCRIMINATOR );
         let cpi_context = CpiContext::new(ctx.accounts.system_program.to_account_info(),Transfer{
             from:ctx.accounts.hxui_vault.to_account_info(),
             to:ctx.accounts.admin.to_account_info()

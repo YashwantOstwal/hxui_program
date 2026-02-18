@@ -1,18 +1,10 @@
 use anchor_lang::prelude::*;
 
-use crate::{Candidate, CandidateStatus, Config, CustomError};
+use crate::{Candidate, CandidateStatus, CustomError};
 #[derive(Accounts)]
 #[instruction(name:String)]
 pub struct CloseCandidate<'info>{
     pub admin:Signer<'info>,
-
-
-    #[account(
-        has_one = admin,
-        seeds = [b"hxui_config"],
-        bump = hxui_config.bump
-    )]
-    pub hxui_config:Account<'info,Config>,
 
     #[account(
         mut,

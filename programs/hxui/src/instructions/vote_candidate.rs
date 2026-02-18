@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use anchor_lang::system_program::{CreateAccount, create_account};
 
 use anchor_spl::{
     associated_token::AssociatedToken,
@@ -8,7 +9,6 @@ use crate::{Candidate, Config, CustomError,ANCHOR_DISCRIMINATOR,VoteReceipt, Can
 #[derive(Accounts)]
 #[instruction(name:String)]
 pub struct VoteCandidate<'info>{
-    #[account(mut)] // for now, the owner is mutable soon it will be a vault
     pub owner:Signer<'info>,
 
     #[account(
@@ -38,14 +38,21 @@ pub struct VoteCandidate<'info>{
     pub hxui_candidate:Account<'info,Candidate>,
 
     
+    /// CHECK: This account can either be VoteReceipt owned by the current program or be uninitialised (owned by System program). 
     #[account(
-        init_if_needed,
-        payer = owner,
-        space = ANCHOR_DISCRIMINATOR + VoteReceipt::INIT_SPACE,
+        mut,
         seeds = [b"vote_receipt",name.as_bytes(),owner.key().as_ref()],
         bump,
     )]
-    pub vote_receipt:Account<'info,VoteReceipt>,
+    pub vote_receipt:UncheckedAccount<'info>,
+
+
+    #[account(
+        mut,
+        seeds = [b"hxui_vault"],
+        bump
+    )]
+    pub hxui_vault:SystemAccount<'info>,
 
     #[account(
         seeds = [b"hxui_config"],
@@ -58,20 +65,51 @@ pub struct VoteCandidate<'info>{
     pub token_program:Program<'info,Token2022>,
 }
 
-pub fn vote(ctx:Context<VoteCandidate>,votes:u64)->Result<()>{
+pub fn vote(ctx:Context<VoteCandidate>,name:String,votes:u64)->Result<()>{
     require!(votes > 0,CustomError::VotesMustBeGreaterThan0);
     let candidate = &mut ctx.accounts.hxui_candidate;
     let vote_receipt = &mut ctx.accounts.vote_receipt;
     let config = & ctx.accounts.hxui_config;
-    if vote_receipt.tokens == 0{
-        candidate.total_receipts +=1;
-        vote_receipt.bump = ctx.bumps.vote_receipt;
-        vote_receipt.id = candidate.id;
-    }
+    let hxui_vault = &mut ctx.accounts.hxui_vault;
 
     let tokens_spent = votes * config.tokens_per_vote;
-    vote_receipt.tokens += tokens_spent;
-    
+    if vote_receipt.owner == ctx.program_id {
+
+        let mut data = vote_receipt.try_borrow_mut_data()?;
+        let mut vote_receipt_data: VoteReceipt = AccountDeserialize::try_deserialize(&mut &data[..])?;
+            
+        vote_receipt_data.tokens += tokens_spent;  
+        vote_receipt_data.try_serialize(&mut &mut data[..])?;
+    }
+    else {
+        candidate.total_receipts +=1;
+
+        let owner_pubkey = &ctx.accounts.owner.key();
+
+        let receipt_seeds:&[&[u8]] = &[b"vote_receipt",name.as_bytes(),owner_pubkey.as_ref(),&[ctx.bumps.vote_receipt]];
+        let vault_seeds:&[&[u8]] = &[b"hxui_vault",&[ctx.bumps.hxui_vault]];
+
+        let pda_signer_seeds = [&receipt_seeds[..],&vault_seeds[..]];
+        let system_program = &mut ctx.accounts.system_program;
+        let cpi_context = CpiContext::new(system_program.to_account_info(),CreateAccount {
+            from:hxui_vault.to_account_info(),
+            to:vote_receipt.to_account_info()
+        }).with_signer(&pda_signer_seeds);
+
+
+        let space = ANCHOR_DISCRIMINATOR + VoteReceipt::INIT_SPACE;
+        let rent = (Rent::get()?).minimum_balance(space);
+        create_account(cpi_context, rent, space as u64, &ctx.program_id)?;
+
+        let mut data = vote_receipt.try_borrow_mut_data()?;
+        let state = VoteReceipt {
+            id:candidate.id,tokens:tokens_spent,bump:ctx.bumps.vote_receipt
+        };
+
+        let discriminator: &[u8] = VoteReceipt::DISCRIMINATOR;
+        data[..8].copy_from_slice(&discriminator);
+        state.serialize(&mut &mut data[8..])?;
+    }
     candidate.number_of_votes += votes;
     let cpi_context = CpiContext::new(ctx.accounts.token_program.to_account_info(),Burn{
         mint:ctx.accounts.hxui_mint.to_account_info(),
@@ -80,4 +118,4 @@ pub fn vote(ctx:Context<VoteCandidate>,votes:u64)->Result<()>{
     });
 
     burn(cpi_context,tokens_spent )
-}
+    }

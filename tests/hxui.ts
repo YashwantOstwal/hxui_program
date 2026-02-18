@@ -1096,7 +1096,7 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
       TOKEN_2022_PROGRAM_ID,
     );
     await program.methods
-      .voteCandidateFree(activeCandidates[0].name, new BN(votes))
+      .voteCandidateWithHxuiLite(activeCandidates[0].name, new BN(votes))
       .accounts({ owner: users[0].publicKey })
       .signers([users[0]])
       .rpc();
@@ -1199,7 +1199,7 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
   // activeCandidatesStatus = [active,active,active,active(claimable),active(claimable),active(claimable),active,active]
   // activeCandidateVotesWithReceipts = [1(0),1(1),2(1),0(0),1(1),2(1),0(0),1(1)]
   it("Attempt to close an Active candidate with 0 receipts (eg. activeCandidates[0]).", async () => {
-    // Only a 0 receipt account can be closed. Ensuring an active account can never be closed even if the receipts is 0
+    // Only a 0 receipt account can be closed. An active account can never be closed even if the receipts is 0
     const candidate = activeCandidates[0];
     const candidateState = await program.account.candidate.fetch(
       candidate.address,
@@ -1430,7 +1430,7 @@ describe("Advance candidate testing", () => {
     async function voteANonActiveCandidate(nonActiveCandidateName: string) {
       try {
         await program.methods
-          .voteCandidateFree(nonActiveCandidateName, new BN(1))
+          .voteCandidateWithHxuiLite(nonActiveCandidateName, new BN(1))
           .accounts({
             owner: users[1].publicKey,
           })
@@ -1603,6 +1603,8 @@ describe("Advance candidate testing", () => {
         candidateState.claimWindow.eq(new BN(0)),
         "Claim window is either live or closed.",
       );
+
+      // are bytes reversed (little endian) ?
       const allVoteReceipts = await program.account.voteReceipt.all([
         {
           memcmp: {
@@ -2348,7 +2350,7 @@ describe("Advance candidate testing", () => {
       );
       assert.equal(tokenBalanceAfter, tokenBalanceBefore);
     }
-    await clearReceipts(newCandidates.claimableWinner[2], users[0]); // users[0] is for verification
+    await clearReceipts(newCandidates.claimableWinner[2], users[0]); // users[0] is for asserting..ixn does not require.
     await clearReceipts(newCandidates.withdrawn[2], users[0]);
   });
 

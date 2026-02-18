@@ -27,6 +27,7 @@ import {
 } from "litesvm";
 import IDL from "../target/idl/hxui.json" with { type: "json" };
 import { SYSTEM_PROGRAM_ID } from "@coral-xyz/anchor/dist/cjs/native/system.js";
+import { triggerAsyncId } from "async_hooks";
 
 const FREE_TOKENS_MINT_AMOUNT = 4;
 const FREE_TOKENS_PER_EPOCH = 100;
@@ -254,7 +255,7 @@ describe("1) initialise_dapp instruction testing", () => {
 });
 
 describe("2) Poll creation testing", () => {
-  it("2.1) Create Genesis poll", () => {
+  it("2.1) Creating a Genesis poll with valid deadline.", () => {
     const now = svm.getClock();
     const poll_deadline = new anchor.BN(now.unixTimestamp + BigInt(86400 * 7)); // 1 week from now.
     const adminBalanceBefore = svm.getBalance(adminPubkey);
@@ -344,34 +345,9 @@ describe("2) Poll creation testing", () => {
 
   it("2.3) Cannot create a new poll before the poll ends", () => {
     const now = svm.getClock().unixTimestamp;
-    const poll_deadline = new anchor.BN(now + BigInt(86400 * 8)); // 8 days from now.
+    const pollDeadline = new anchor.BN(now + BigInt(86400 * 8)); // 8 days from now.
 
-    const data = coder.instruction.encode("create_poll", {
-      poll_deadline,
-    });
-
-    const ix = new TransactionInstruction({
-      programId,
-      keys: [
-        {
-          pubkey: adminPubkey,
-          isSigner: true,
-          isWritable: true,
-        },
-        {
-          pubkey: getPda(SEEDS.hxuiConfig).address,
-          isSigner: false,
-          isWritable: false,
-        },
-        {
-          pubkey: getPda(SEEDS.hxuiPoll).address,
-          isSigner: false,
-          isWritable: true,
-        },
-        { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false },
-      ],
-      data,
-    });
+    const ix = getCreatePollInstruction({ pollDeadline });
     const failed = sendTransaction([ix], [admin]);
 
     if (failed instanceof FailedTransactionMetadata) {
@@ -380,64 +356,64 @@ describe("2) Poll creation testing", () => {
       assert(false);
     }
   });
-  it("2.5) Attempt to create a new poll even after the poll has ended but the winner is not drawn yet. FAILS", () => {
-    let clock = svm.getClock();
-    clock.unixTimestamp = clock.unixTimestamp + BigInt(7 * 86400 + 1); // Time travelling to the next second after the end of poll.
-    svm.setClock(clock);
+  // it("2.5) Attempt to create a new poll even after the poll has ended but the winner is not drawn yet. FAILS", () => {
+  //   let clock = svm.getClock();
+  //   clock.unixTimestamp = clock.unixTimestamp + BigInt(7 * 86400 + 1); // Time travelling to the next second after the end of poll.
+  //   svm.setClock(clock);
 
-    const pollAccount = svm.getAccount(getPda(SEEDS.hxuiPoll).address);
-    const pollAccountData = coder.accounts.decode(
-      "Poll",
-      Buffer.from(pollAccount.data),
-    );
+  //   const pollAccount = svm.getAccount(getPda(SEEDS.hxuiPoll).address);
+  //   const pollAccountData = coder.accounts.decode(
+  //     "Poll",
+  //     Buffer.from(pollAccount.data),
+  //   );
 
-    // Ensuring the poll has ended.
-    assert(
-      clock.unixTimestamp > pollAccountData.current_poll_deadline.toNumber(),
-    );
+  //   // Ensuring the poll has ended.
+  //   assert(
+  //     clock.unixTimestamp > pollAccountData.current_poll_deadline.toNumber(),
+  //   );
 
-    const now = clock.unixTimestamp;
-    const poll_deadline = new anchor.BN(now + BigInt(86400 * 7));
-    const data = coder.instruction.encode("create_poll", {
-      poll_deadline,
-    });
+  //   const now = clock.unixTimestamp;
+  //   const poll_deadline = new anchor.BN(now + BigInt(86400 * 7));
+  //   const data = coder.instruction.encode("create_poll", {
+  //     poll_deadline,
+  //   });
 
-    const ix = new TransactionInstruction({
-      programId,
-      keys: [
-        {
-          pubkey: adminPubkey,
-          isSigner: true,
-          isWritable: true,
-        },
-        {
-          pubkey: getPda(SEEDS.hxuiConfig).address,
-          isSigner: false,
-          isWritable: false,
-        },
-        {
-          pubkey: getPda(SEEDS.hxuiPoll).address,
-          isSigner: false,
-          isWritable: true,
-        },
-        { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false },
-      ],
-      data,
-    });
+  //   const ix = new TransactionInstruction({
+  //     programId,
+  //     keys: [
+  //       {
+  //         pubkey: adminPubkey,
+  //         isSigner: true,
+  //         isWritable: true,
+  //       },
+  //       {
+  //         pubkey: getPda(SEEDS.hxuiConfig).address,
+  //         isSigner: false,
+  //         isWritable: false,
+  //       },
+  //       {
+  //         pubkey: getPda(SEEDS.hxuiPoll).address,
+  //         isSigner: false,
+  //         isWritable: true,
+  //       },
+  //       { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false },
+  //     ],
+  //     data,
+  //   });
 
-    const tx = new Transaction().add(ix);
-    tx.feePayer = payer.publicKey;
-    tx.recentBlockhash = svm.latestBlockhash();
-    tx.sign(payer, admin);
-    const failed = svm.sendTransaction(tx);
-    svm.expireBlockhash();
+  //   const tx = new Transaction().add(ix);
+  //   tx.feePayer = payer.publicKey;
+  //   tx.recentBlockhash = svm.latestBlockhash();
+  //   tx.sign(payer, admin);
+  //   const failed = svm.sendTransaction(tx);
+  //   svm.expireBlockhash();
 
-    if (failed instanceof FailedTransactionMetadata) {
-      assert(failed.meta().logs()[2].search("WinnerNotDrawn.") != -1);
-    } else {
-      assert(false);
-    }
-  });
+  //   if (failed instanceof FailedTransactionMetadata) {
+  //     assert(failed.meta().logs()[2].search("WinnerNotDrawn.") != -1);
+  //   } else {
+  //     assert(false);
+  //   }
+  // });
 
   it(" Winner for current poll is drawn");
   it(
@@ -465,7 +441,7 @@ const [mintedTimestampAddressForAdmin, mintedTimestampBump] =
 
 //     const adminBalanceBefore = svm.getBalance(adminPubkey);
 
-//     const ix = getRegisterForFreeTokens({ for: adminPubkey });
+//     const ix = getRegisterForFreeTokensInstruction({ for: adminPubkey });
 
 //     const tx = new Transaction().add(ix);
 //     tx.feePayer = payer.publicKey;
@@ -755,7 +731,7 @@ const [mintedTimestampAddressForAdmin, mintedTimestampBump] =
 //         TOKEN_2022_PROGRAM_ID,
 //       );
 
-//       const registerIx = getRegisterForFreeTokens({ for: user.publicKey });
+//       const registerIx = getRegisterForFreeTokensInstruction({ for: user.publicKey });
 //       const mintIx = getMintFreeTokensInstruction({ to: user.publicKey });
 
 //       const metadata = sendTransaction(
@@ -813,7 +789,7 @@ const [mintedTimestampAddressForAdmin, mintedTimestampBump] =
 //       TOKEN_2022_PROGRAM_ID,
 //     );
 
-//     const registerIx = getRegisterForFreeTokens({ for: user.publicKey });
+//     const registerIx = getRegisterForFreeTokensInstruction({ for: user.publicKey });
 //     const mintIx = getMintFreeTokensInstruction({ to: user.publicKey });
 
 //     const metadata = sendTransaction(
@@ -853,8 +829,8 @@ describe("5) Buying HXUI tokens for users[0]", async () => {
     }
   });
 
-  const tokens = 7;
-  it("users[0] and users[1] buys 7 HXUI tokens each without an associated token account.", async () => {
+  const tokens = 10;
+  it("users[0] and users[1] buys 10 HXUI tokens each without an associated token account.", async () => {
     const tokenAddress = getAssociatedTokenAddressSync(
       getPda(SEEDS.hxuiMint).address,
       users[0].publicKey,
@@ -900,9 +876,9 @@ describe("5) Buying HXUI tokens for users[0]", async () => {
     );
     sendTransaction([ix2], [users[1]]);
   });
-  //  users[0] and users[1] has 7 HXUI tokens
+  //  users[0] and users[1] has 10 HXUI tokens
   // x----------------------------x
-  it("users[0] buying 7 HXUI tokens with an associated token account.", () => {
+  it("users[0] buying 10 HXUI tokens with an associated token account.", () => {
     const usersBalanceBefore = svm.getBalance(users[0].publicKey);
 
     const ix = getBuyPaidTokensInstruction(
@@ -927,63 +903,9 @@ describe("5) Buying HXUI tokens for users[0]", async () => {
         .eq(new anchor.BN(usersBalanceBefore - usersBalanceAfter)),
     );
   });
-  const [newAccountAddress] = PublicKey.findProgramAddressSync(
-    [Buffer.from("hxui_new_account")],
-    programId,
-  );
-  it("Making the vault pay the rent", () => {
-    svm.airdrop(getPda(SEEDS.hxuiVault).address, BigInt(LAMPORTS_PER_SOL));
-    const data = coder.instruction.encode("create_new_account", {});
-    const ixn = new TransactionInstruction({
-      programId,
-      keys: [
-        {
-          pubkey: getPda(SEEDS.hxuiVault).address,
-          isSigner: false,
-          isWritable: true,
-        },
-        { pubkey: newAccountAddress, isSigner: false, isWritable: true },
-        { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false },
-      ],
-      data,
-    });
-    const vaultBalanceBefore = svm.getBalance(getPda(SEEDS.hxuiVault).address);
-    sendTransaction([ixn, ixn, ixn], [], { logIfFailed: true });
-    const vaultBalanceAfter = svm.getBalance(getPda(SEEDS.hxuiVault).address);
-
-    const newAccountInfo = svm.getAccount(newAccountAddress);
-    console.log(newAccountInfo);
-    console.log(
-      vaultBalanceBefore - vaultBalanceAfter,
-      newAccountInfo.lamports,
-    );
-    const newAccountData = coder.accounts.decode(
-      "Schema",
-      Buffer.from(newAccountInfo.data),
-    );
-    console.log(newAccountData);
-  });
-
-  it("Reset the account", () => {
-    const data = coder.instruction.encode("temp", {});
-    const ixn = new TransactionInstruction({
-      programId,
-      keys: [{ pubkey: newAccountAddress, isSigner: false, isWritable: true }],
-      data,
-    });
-    sendTransaction([ixn, ixn], [], { logIfFailed: true });
-
-    const newAccountInfo = svm.getAccount(newAccountAddress);
-    console.log(newAccountInfo);
-    const newAccountData = coder.accounts.decode(
-      "Schema",
-      Buffer.from(newAccountInfo.data),
-    );
-    console.log(newAccountData);
-  });
 });
 
-//  users[0] has 14 HXUI tokens
+//  users[0] has 20 HXUI tokens and users[1] has 10 HXUI tokens
 // x----------------------------x
 
 interface Candidate {
@@ -1016,7 +938,9 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
         TOKEN_2022_PROGRAM_ID,
       );
 
-      const registerIx = getRegisterForFreeTokens({ for: users[i].publicKey });
+      const registerIx = getRegisterForFreeTokensInstruction({
+        for: users[i].publicKey,
+      });
 
       const mintIx = getMintFreeTokensInstruction({ to: users[i].publicKey });
       ixs.push(tokenCreationIx, registerIx, mintIx);
@@ -1045,7 +969,7 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
   });
 
   // users.length = 3
-  // usersHXUITokenBalance = [14,0,0]
+  // usersHXUITokenBalance = [20,10,0]
   // usersHXUILiteTokenBalance = [2,2,2]
 
   it("5.1) Creating 8 candidates to test all scenarios.", async () => {
@@ -1076,10 +1000,6 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
     const adminBalanceAfter = svm.getBalance(adminPubkey);
 
     const candidateAccountBalance = svm.getBalance(candidateAddress);
-    // const expectedcandidateAccountBalance = await getRent(
-    //   CANDIDATE_ACCOUNT_SPACE,
-    // );
-    // assert.equal(candidateAccountBalance, expectedcandidateAccountBalance);
     assert.equal(
       adminBalanceBefore - adminBalanceAfter,
       candidateAccountBalance,
@@ -1164,7 +1084,7 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
       }
     }
     // users.length = 3
-    // usersHXUITokenBalance = [14,0,0]
+    // usersHXUITokenBalance = [20,10,0]
     // usersHXUILiteTokenBalance = [2,2,2]
     // activeCandidatesStatus = [active,active,active,active(claimable),active(claimable),active(claimable),active,active]
   });
@@ -1199,13 +1119,577 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
   });
 
   // users.length = 3
-  // usersHXUITokenBalance = [14,0,0]
+  // usersHXUITokenBalance = [20,10,0]
   // usersHXUILiteTokenBalance = [0,2,2]
   // activeCandidatesStatus = [active,active,active,active(claimable),active(claimable),active(claimable),active,active]
   // activeCandidateVotesWithReceipts = [1 (0),0,0,0,0,0,0,0]
-});
 
-function getRegisterForFreeTokens(accounts: { for: PublicKey }) {
+  it("5.2) users[0] gives (0,1,2,0,1,2,0,1) votes to 8 candidates with HXUI paid tokens. PDA vault as rent payer for receipts.", async () => {
+    const user = users[0];
+    for (let i = 0; i < activeCandidates.length; i++) {
+      const votes = i % 3;
+      if (votes > 0) {
+        const candidateAccountBefore = getCandidateAccount(
+          activeCandidates[i].name,
+        );
+
+        const tokenAccountBefore = getHxuiAccount(user.publicKey);
+
+        const expectedReceiptRent = svm.minimumBalanceForRentExemption(
+          BigInt(21),
+        ); // 8 + 13
+        const vaultBalanceBefore = svm.getBalance(
+          getPda(SEEDS.hxuiVault).address,
+        );
+        const ix = getVoteCandidateInstruction(
+          { owner: user.publicKey },
+          {
+            candidateName: activeCandidates[i].name,
+            votes: new anchor.BN(votes),
+          },
+        );
+        sendTransaction([ix], [user], { logIfFailed: true });
+        const vaultBalanceAfter = svm.getBalance(
+          getPda(SEEDS.hxuiVault).address,
+        );
+        const [voteReceipt, receiptInfo] = getVoteReceipt(
+          activeCandidates[i].name,
+          user.publicKey,
+        );
+
+        assert.equal(receiptInfo.lamports, expectedReceiptRent);
+        assert.equal(
+          vaultBalanceBefore - vaultBalanceAfter,
+          receiptInfo.lamports,
+        );
+        const candidateAccountAfter = getCandidateAccount(
+          activeCandidates[i].name,
+        );
+        const tokenAccountAfter = getHxuiAccount(user.publicKey);
+
+        assert(
+          candidateAccountAfter.number_of_votes
+            .sub(candidateAccountBefore.number_of_votes)
+            .eq(new anchor.BN(votes)),
+        );
+
+        const config = getConfigAccount();
+
+        const tokensSpent = new anchor.BN(
+          tokenAccountBefore.amount - tokenAccountAfter.amount,
+        );
+        assert(
+          tokensSpent.eq(config.tokens_per_vote.mul(new anchor.BN(votes))),
+        );
+
+        // Verifying the receipt.
+        assert.equal(voteReceipt.id, candidateAccountAfter.id);
+
+        // one receipt per voter per candidate. irrespective of votes.
+        assert(voteReceipt.tokens.eq(tokensSpent));
+      }
+    }
+  });
+  // usersHXUITokenBalance = [6,10,0]
+  // usersHXUILiteTokenBalance = [2,4,4]
+  // activeCandidatesStatus = [active,active,active,active(claimable),active(claimable),active(claimable),active,active]
+  // activeCandidateVotesWithReceipts = [1(0),1(1),2(1),0(0),1(1),2(1),0(0),1(1)]
+  it("5.3) users[0] voting the previously voted candidate (activeCandidates[2]) does not create a new receipt rather mutates the old one.", () => {
+    const user = users[0];
+    const candidateName = activeCandidates[2].name;
+    const votes = new anchor.BN(1);
+
+    const ix = getVoteCandidateInstruction(
+      { owner: user.publicKey },
+      { candidateName, votes },
+    );
+
+    // receipt already exists, adding over the new votes.
+    const [voteReceiptBefore] = getVoteReceipt(candidateName, user.publicKey);
+
+    const vaultBalanceBefore = svm.getBalance(getPda(SEEDS.hxuiVault).address);
+    sendTransaction([ix], [user]);
+    const vaultBalanceAfter = svm.getBalance(getPda(SEEDS.hxuiVault).address);
+
+    assert.equal(
+      vaultBalanceAfter,
+      vaultBalanceBefore,
+      "Vault lost its lamports.",
+    );
+
+    const [voteReceiptAfter] = getVoteReceipt(candidateName, user.publicKey);
+    const config = getConfigAccount();
+    assert(
+      new anchor.BN(voteReceiptAfter.tokens - voteReceiptBefore.tokens).eq(
+        votes.mul(config.tokens_per_vote),
+      ),
+    );
+  });
+  // usersHXUITokenBalance = [4,10,0]
+  // usersHXUILiteTokenBalance = [2,4,4]
+  // activeCandidatesStatus = [active,active,active,active(claimable),active(claimable),active(claimable),active,active]
+  // activeCandidateVotesWithReceipts = [1(0),1(1),3(1),0(0),1(1),2(1),0(0),1(1)]
+  it("Attempt to close an Active candidate with 0 receipts (eg. activeCandidates[0]).", async () => {
+    // Only a 0 receipt account can be closed. An active account can never be closed even if the receipts is 0
+
+    const candidateName = activeCandidates[0].name;
+    const candidateState = getCandidateAccount(candidateName);
+    assert(candidateState.candidate_status.Active, "Not an active candidate");
+
+    assert.equal(
+      candidateState.total_receipts.isZero(),
+      true,
+      "Candidate has non-zero receipts",
+    );
+
+    const ix = getCloseCandidateInstruction({ candidateName });
+    const failed = sendTransaction([ix], [admin]);
+    assertTxFailedWithErrorCode(failed, "ActiveCandidateCannotBeClosed");
+  });
+
+  // usersHXUITokenBalance = [4,10,0]
+  // usersHXUILiteTokenBalance = [2,4,4]
+  // activeCandidatesStatus = [active,active,active,active(claimable),active(claimable),active(claimable),active,active]
+  // activeCandidateVotesWithReceipts = [1(0),1(1),3(1),0(0),1(1),2(1),0(0),1(1)]
+  it("5.4) Withdraw the first 3 active candidates in activeCandidates.", async () => {
+    //Also verified the activeCandidates[0..2] are unclaimble candidates with 0,1,2 votes respectively and are withdrawn.
+    for (let i = 0; i < 3; i++) {
+      const candidateName = activeCandidates[i].name;
+      const candidateStateBefore = getCandidateAccount(candidateName);
+      // const candidateBefore = await program.account.candidate.fetch(
+      //   activeCandidate.address,
+      // );
+      assert.equal(candidateStateBefore.claimable_if_winner, false);
+      assert(candidateStateBefore.candidate_status.Active);
+
+      const ix = getWithdrawCandidateInstruction({ candidateName });
+      sendTransaction([ix], [admin]);
+      const candidateStateAfter = getCandidateAccount(candidateName);
+
+      assert(candidateStateAfter.candidate_status.Withdrawn);
+
+      const pollAccount = getPollAccount();
+      assert(
+        !pollAccount.current_poll_candidates.includes(candidateStateAfter.id),
+      );
+      newCandidates.withdrawn.push(activeCandidates[i]);
+    }
+
+    //No longer active candidates.
+    activeCandidates.slice(3);
+  });
+  // users.length = 3
+  // usersHXUITokenBalance = [4,10,0]
+  // usersHXUILiteTokenBalance = [2,4,4]
+  // activeCandidatesStatus = [withdrawn,withdrawn,withdrawn,active(claimable),active(claimable),active(claimable),active,active]
+  // activeCandidateVotesWithReceipts = [1(0),1(1),3(1),0(0),1(1),2(1),0(0),1(1)]
+
+  it("5.5) Picking 5 winners (all the 5 left active candidates) immediately after the end of each poll by time travelling.", async () => {
+    for (let i = 0; i < 5; i++) {
+      let expectedWinnerCandidateId: number;
+      let maxVotes: anchor.BN = new anchor.BN(0);
+      let expectedWinnerIndex: number;
+
+      const candidates: {
+        pubkey: PublicKey;
+        isSigner: boolean;
+        isWritable: boolean;
+      }[] = [];
+      for (let i = 0; i < activeCandidates.length; i++) {
+        const candidateAddress = activeCandidates[i].address;
+
+        const candidateAccount = getCandidateAccount(activeCandidates[i].name);
+        if (candidateAccount.candidate_status.Active) {
+          if (
+            expectedWinnerCandidateId == undefined ||
+            candidateAccount.number_of_votes.cmp(maxVotes) == 1 ||
+            (candidateAccount.number_of_votes.cmp(maxVotes) == 0 &&
+              candidateAccount.id < expectedWinnerCandidateId)
+          ) {
+            expectedWinnerCandidateId = candidateAccount.id;
+            maxVotes = candidateAccount.number_of_votes;
+            expectedWinnerIndex = i;
+          }
+          candidates.push({
+            pubkey: candidateAddress,
+            isSigner: false,
+            isWritable: true,
+          });
+        }
+      }
+      const pollAccountBefore = getPollAccount();
+      assert.equal(pollAccountBefore.current_poll_winner_drawn, false);
+      const now = svm.getClock();
+
+      // Deadline is ahead of the current time.
+      assert(
+        pollAccountBefore.current_poll_deadline.cmp(now.unixTimestamp) == 1,
+      );
+
+      // time travelling to next second after the poll has ended.
+      now.unixTimestamp = BigInt(
+        pollAccountBefore.current_poll_deadline.toNumber() + 1,
+      );
+      svm.setClock(now);
+
+      // We are just a second ahead of the deadline now.
+      assert(
+        pollAccountBefore.current_poll_deadline.cmp(
+          new anchor.BN(now.unixTimestamp),
+        ) == -1,
+      );
+      const ix = getDrawWinnerInstruction(candidates);
+      sendTransaction([ix], [admin], { logIfFailed: true });
+
+      const pollAccountAfter = getPollAccount();
+      assert.equal(
+        pollAccountAfter.current_poll_winner_drawn,
+        true,
+        "Poll state is not updated after drawWinner ixn.",
+      );
+
+      // verify the winner.
+      const winnerCandidate = getCandidateAccount(
+        activeCandidates[expectedWinnerIndex].name,
+      );
+
+      // Previously active -> winner or claimable winner.
+      if (winnerCandidate.claimable_if_winner) {
+        assert(
+          !!winnerCandidate.candidate_status.ClaimableWinner,
+          "Not a claimable winner",
+        );
+        assert(
+          expectedWinnerIndex == 3 ||
+            expectedWinnerIndex == 4 ||
+            expectedWinnerIndex == 5,
+        );
+        newCandidates.claimableWinner.unshift(
+          activeCandidates[expectedWinnerIndex],
+        );
+      } else {
+        assert(!!winnerCandidate.candidate_status.Winner, "Not a winner");
+        assert(
+          !(
+            expectedWinnerIndex == 3 ||
+            expectedWinnerIndex == 4 ||
+            expectedWinnerIndex == 5
+          ),
+        );
+        newCandidates.winner.unshift(activeCandidates[expectedWinnerIndex]);
+      }
+
+      assert(
+        !pollAccountAfter.current_poll_candidates.includes(
+          expectedWinnerCandidateId,
+        ),
+        "Poll state still considers the winner as competing candidate",
+      );
+
+      // creating a new poll to draw more winners, only one winner per poll.
+      const pollDeadline = new anchor.BN(now.unixTimestamp + BigInt(7 * 86400));
+      const ix2 = getCreatePollInstruction({ pollDeadline });
+      sendTransaction([ix2], [admin], { logIfFailed: true });
+    }
+    //Garbage collected.
+    // while (activeCandidates.length === 0) {
+    //   activeCandidates.pop();
+    // }
+  });
+  /*
+  usersHXUITokenBalance = [4,10,0]
+usersHXUILiteTokenBalance = [2,4,4]
+activeCandidatesStatus = [withdrawn,withdrawn,withdrawn,winner(claimable),winner(claimable),winner(claimable),winner,winner]
+
+
+activeCandidateVotesWithReceipts = [1(0),1(1),3(1),0(0),1(1),2(1),0(0),1(1)] 
+
+newCandidates = {
+    claimableWinner:[0(0),1(1),2(1)],
+    winner:[0(0),1(1)],
+    withdrawn:[1(0),1(1),2(1)]
+  }
+newCandidates.claimableWinner[0] means winner with claimable with 0 votes.
+Except -> newCandidates.withdrawn[2] has 3 votes.
+*/
+});
+describe("6)Withdrawl and financing the vote receipts.", () => {
+  /* minimum balance for hxuiVault-> enough lamports to exempt its own rent + enough lamports to exempt vote receipt accounts
+   created upon new voters per candidate by assuming every vote requires a vote receipt. The economics is managed by ensuring
+    the lamports spent to buy tokens to vote will always be greater than the rent of the VoteReceipt account. So user buys voting
+     tokens -> sends the lamports to the vault -> vaul pays the rent upon vote. Hastle free, Better UX. The money is made when the
+      receipt is closed in various scenarios. I think I should have a "rob_the_vault" instruction that just empties the vault...Because if
+       there exists a non active user who is never gonna vote but holding 4 tokens, then the lamports equivalent to the rent of 2 vote
+        receipt accounts will be stucked in the vault forever.Or should I keep the admin as permanent delegate of hxuiMint token and
+    use interest bearing extension to track the last mint time (is it possible). I can run a 'crank' script that burns tokens
+    in token accounts for non active users after a threshold time and let me withdraw more lamports from the vault.
+    */
+
+  function getMinimumVaultBalance() {
+    const hxuiMint = getHxuiMint();
+    const hxuiConfig = getConfigAccount();
+    return (
+      svm.minimumBalanceForRentExemption(BigInt(0)) +
+      BigInt(Math.floor(Number(hxuiMint.supply) / hxuiConfig.tokens_per_vote)) *
+        svm.minimumBalanceForRentExemption(BigInt(21))
+    );
+  }
+  it("Attempt withdrawl from non-admin", () => {
+    const ix = getSafeWithdrawlFromVaultInstruction();
+    try {
+      sendTransaction([ix], []);
+      assert(false);
+    } catch (_) {
+      assert(true);
+    }
+  });
+  it("Withdraw amount less than possible from the vault", () => {
+    const vaultBalanceBefore = svm.getBalance(getPda(SEEDS.hxuiVault).address);
+    const minimumVaultBalance = getMinimumVaultBalance();
+    const maximumWithdrawAmount = vaultBalanceBefore - minimumVaultBalance;
+    const withdrawAmount = new anchor.BN(maximumWithdrawAmount).divRound(
+      new anchor.BN(2),
+    );
+    const ix = getSafeWithdrawlFromVaultInstruction({
+      amount: withdrawAmount,
+    });
+    const adminBalanceBefore = svm.getBalance(adminPubkey);
+    sendTransaction([ix], [admin]);
+
+    const vaultBalanceAfter = svm.getBalance(getPda(SEEDS.hxuiVault).address);
+    assert(
+      new anchor.BN(vaultBalanceBefore - vaultBalanceAfter).eq(withdrawAmount),
+    );
+    const adminBalanceAfter = svm.getBalance(adminPubkey);
+    assert.equal(adminBalanceAfter - adminBalanceBefore, withdrawAmount);
+  });
+  it("Attempt to withdraw amount greater than the vault can afford, must FAIL", () => {
+    const vaultBalanceBefore = svm.getBalance(getPda(SEEDS.hxuiVault).address);
+    const minimumVaultBalance = getMinimumVaultBalance();
+    const maximumWithdrawAmount = vaultBalanceBefore - minimumVaultBalance;
+    const withdrawAmount = new anchor.BN(minimumVaultBalance)
+      .divRound(new anchor.BN(2))
+      .add(new anchor.BN(maximumWithdrawAmount));
+    const ix = getSafeWithdrawlFromVaultInstruction({
+      amount: withdrawAmount,
+    });
+    const failed = sendTransaction([ix], [admin]);
+    assertTxFailedWithErrorCode(failed, "InsufficientFunds");
+  });
+  it("Withdraw maximum amount possible from the vault WITHOUT explicitly passing the amount.", () => {
+    const vaultBalanceBefore = svm.getBalance(getPda(SEEDS.hxuiVault).address);
+    const minimumVaultBalance = getMinimumVaultBalance();
+    const maximumWithdrawAmount = vaultBalanceBefore - minimumVaultBalance;
+    const ix = getSafeWithdrawlFromVaultInstruction();
+    const adminBalanceBefore = svm.getBalance(adminPubkey);
+    sendTransaction([ix], [admin]);
+
+    const vaultBalanceAfter = svm.getBalance(getPda(SEEDS.hxuiVault).address);
+    assert.equal(vaultBalanceAfter, minimumVaultBalance);
+    const adminBalanceAfter = svm.getBalance(adminPubkey);
+    assert.equal(adminBalanceAfter - adminBalanceBefore, maximumWithdrawAmount);
+  });
+});
+//instructions
+function getSafeWithdrawlFromVaultInstruction(
+  instructionArgs: {
+    amount: null | undefined | anchor.BN;
+  } = { amount: null },
+) {
+  const { amount } = instructionArgs;
+  const data = coder.instruction.encode("safe_withdraw_from_vault", { amount });
+  return new TransactionInstruction({
+    programId,
+    keys: [
+      //admin, config, vault,mint system, token
+      {
+        pubkey: adminPubkey,
+        isSigner: true,
+        isWritable: true,
+      },
+      {
+        pubkey: getPda(SEEDS.hxuiConfig).address,
+        isSigner: false,
+        isWritable: false,
+      },
+      {
+        pubkey: getPda(SEEDS.hxuiVault).address,
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: getPda(SEEDS.hxuiMint).address,
+        isSigner: false,
+        isWritable: false,
+      },
+      { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: TOKEN_2022_PROGRAM_ID, isSigner: false, isWritable: false },
+    ],
+    data,
+  });
+}
+
+function getCreatePollInstruction(instructionArgs: {
+  pollDeadline: anchor.BN;
+}) {
+  const { pollDeadline: poll_deadline } = instructionArgs;
+  const data = coder.instruction.encode("create_poll", {
+    poll_deadline,
+  });
+  return new TransactionInstruction({
+    programId,
+    keys: [
+      {
+        pubkey: adminPubkey,
+        isSigner: true,
+        isWritable: true,
+      },
+      {
+        pubkey: getPda(SEEDS.hxuiConfig).address,
+        isSigner: false,
+        isWritable: false,
+      },
+      {
+        pubkey: getPda(SEEDS.hxuiPoll).address,
+        isSigner: false,
+        isWritable: true,
+      },
+      { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false },
+    ],
+    data,
+  });
+}
+
+function getDrawWinnerInstruction(candidates: anchor.web3.AccountMeta[]) {
+  const data = coder.instruction.encode("draw_winner", {});
+  return new TransactionInstruction({
+    programId,
+    keys: [
+      { pubkey: adminPubkey, isSigner: true, isWritable: false },
+      {
+        pubkey: getPda(SEEDS.hxuiConfig).address,
+        isSigner: false,
+        isWritable: false,
+      },
+      {
+        pubkey: getPda(SEEDS.hxuiPoll).address,
+        isSigner: false,
+        isWritable: true,
+      },
+      ...candidates,
+    ],
+    data,
+  });
+}
+function getWithdrawCandidateInstruction(instructionArgs: {
+  candidateName: string;
+}) {
+  const { candidateName: _name } = instructionArgs;
+  const data = coder.instruction.encode("withdraw_candidate", { _name });
+  const candidateAddress = getCandidatePda(_name).address;
+  return new TransactionInstruction({
+    programId,
+    keys: [
+      { pubkey: adminPubkey, isSigner: true, isWritable: false },
+      { pubkey: candidateAddress, isSigner: false, isWritable: true },
+      {
+        pubkey: getPda(SEEDS.hxuiPoll).address,
+        isSigner: false,
+        isWritable: true,
+      },
+    ],
+    data,
+  });
+}
+function getCloseCandidateInstruction(instructionArgs: {
+  candidateName: string;
+}) {
+  const { candidateName: _name } = instructionArgs;
+  const data = coder.instruction.encode("close_candidate", { _name });
+
+  const candidateAddress = getCandidatePda(_name).address;
+  return new TransactionInstruction({
+    programId,
+    keys: [
+      { pubkey: adminPubkey, isSigner: true, isWritable: false },
+      { pubkey: candidateAddress, isSigner: false, isWritable: true },
+      {
+        pubkey: getPda(SEEDS.hxuiVault).address,
+        isSigner: false,
+        isWritable: true,
+      },
+    ],
+    data,
+  });
+}
+function getVoteCandidateInstruction(
+  context: { owner: PublicKey },
+  instructionArgs: {
+    candidateName: string;
+    votes: anchor.BN;
+  },
+) {
+  const { owner } = context;
+  const { candidateName: name, votes } = instructionArgs;
+
+  const candidateAddress = getCandidatePda(name).address;
+  const data = coder.instruction.encode("vote_candidate", {
+    name,
+    votes,
+  });
+
+  const tokenAddress = getHxuiTokenAddress(owner);
+  const [voteReceiptAddress] = PublicKey.findProgramAddressSync(
+    [Buffer.from("vote_receipt"), Buffer.from(name), owner.toBuffer()],
+    programId,
+  );
+  return new TransactionInstruction({
+    programId,
+    keys: [
+      { pubkey: owner, isSigner: true, isWritable: false },
+      { pubkey: tokenAddress, isSigner: false, isWritable: true },
+      {
+        pubkey: getPda(SEEDS.hxuiMint).address,
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: candidateAddress,
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: voteReceiptAddress,
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: getPda(SEEDS.hxuiVault).address,
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: getPda(SEEDS.hxuiConfig).address,
+        isSigner: false,
+        isWritable: false,
+      },
+      { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false },
+      {
+        pubkey: ASSOCIATED_TOKEN_PROGRAM_ID,
+        isSigner: false,
+        isWritable: false,
+      },
+      {
+        pubkey: TOKEN_2022_PROGRAM_ID,
+        isSigner: false,
+        isWritable: false,
+      },
+    ],
+    data,
+  });
+}
+
+function getRegisterForFreeTokensInstruction(accounts: { for: PublicKey }) {
   const data = coder.instruction.encode("register_for_free_tokens", {});
   const [mintedTimestampAddress] = PublicKey.findProgramAddressSync(
     [Buffer.from("minted_timestamp"), accounts.for.toBuffer()],
@@ -1315,6 +1799,7 @@ function getMintFreeTokensInstruction(accounts: { to: PublicKey }) {
 function getHxuiMint() {
   const hxuiMintAddress = getPda(SEEDS.hxuiMint).address;
   const hxuiMintInfo = svm.getAccount(hxuiMintAddress);
+
   return unpackMint(
     hxuiMintAddress,
     hxuiMintInfo as AccountInfo<Buffer>,
@@ -1362,6 +1847,53 @@ function getBuyPaidTokensInstruction(
     data,
   });
 }
+
+function getCreateCandidateInstruction(
+  accounts: { admin: PublicKey },
+  instructionArgs: {
+    name: string;
+    description: string;
+    claimable_if_winner: boolean;
+  },
+) {
+  const data = coder.instruction.encode("create_candidate", instructionArgs);
+  const candidateAddress = getCandidatePda(instructionArgs.name).address;
+  return new TransactionInstruction({
+    programId,
+    keys: [
+      { pubkey: accounts.admin, isSigner: true, isWritable: true },
+      {
+        pubkey: getPda(SEEDS.hxuiConfig).address,
+        isSigner: false,
+        isWritable: false,
+      },
+
+      { pubkey: candidateAddress, isSigner: false, isWritable: true },
+      {
+        pubkey: getPda(SEEDS.hxuiPoll).address,
+        isSigner: false,
+        isWritable: true,
+      },
+
+      { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: TOKEN_2022_PROGRAM_ID, isSigner: false, isWritable: false },
+    ],
+    data,
+  });
+}
+//accounts
+function getVoteReceipt(candidateName: string, owner: PublicKey) {
+  const [receiptAddress] = PublicKey.findProgramAddressSync(
+    [Buffer.from("vote_receipt"), Buffer.from(candidateName), owner.toBuffer()],
+    programId,
+  );
+  const receiptInfo = svm.getAccount(receiptAddress);
+  const receiptData = coder.accounts.decode(
+    "VoteReceipt",
+    Buffer.from(receiptInfo.data),
+  );
+  return [receiptData, receiptInfo] as const;
+}
 function getHxuiLiteMint() {
   const mintAddress = getPda(SEEDS.hxuiLiteMint).address;
   const mintInfo = svm.getAccount(mintAddress);
@@ -1408,19 +1940,20 @@ function assertTxFailedWithErrorCode(
   errorCode: string,
   printLogs: boolean = false,
 ) {
-  if (failed instanceof TransactionMetadata)
-    return assert(false, "Transaction did not fail");
+  if (failed instanceof TransactionMetadata) {
+    assert(false, "Transaction did not fail");
+  }
   const logs = failed.meta().logs();
   if (printLogs) {
     console.log(logs);
   }
   for (const log of logs) {
-    if (log.search("Error Code: " + errorCode) == -1) return assert(true);
+    if (log.search("Error Code: " + errorCode) != -1) {
+      assert(true);
+      return;
+    }
   }
-  return assert(
-    false,
-    `Transaction failed but not with this ${errorCode} code.`,
-  );
+  assert(false, `Transaction failed but not with this ${errorCode} code.`);
 }
 
 function getPollAccount() {
@@ -1430,40 +1963,6 @@ function getPollAccount() {
 function getConfigAccount() {
   const configAccountInfo = svm.getAccount(getPda(SEEDS.hxuiConfig).address);
   return coder.accounts.decode("Config", Buffer.from(configAccountInfo.data));
-}
-
-function getCreateCandidateInstruction(
-  accounts: { admin: PublicKey },
-  instructionArgs: {
-    name: string;
-    description: string;
-    claimable_if_winner: boolean;
-  },
-) {
-  const data = coder.instruction.encode("create_candidate", instructionArgs);
-  const candidateAddress = getCandidatePda(instructionArgs.name).address;
-  return new TransactionInstruction({
-    programId,
-    keys: [
-      { pubkey: accounts.admin, isSigner: true, isWritable: true },
-      {
-        pubkey: getPda(SEEDS.hxuiConfig).address,
-        isSigner: false,
-        isWritable: false,
-      },
-
-      { pubkey: candidateAddress, isSigner: false, isWritable: true },
-      {
-        pubkey: getPda(SEEDS.hxuiPoll).address,
-        isSigner: false,
-        isWritable: true,
-      },
-
-      { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false },
-      { pubkey: TOKEN_2022_PROGRAM_ID, isSigner: false, isWritable: false },
-    ],
-    data,
-  });
 }
 
 function getCandidatePda(name: string) {

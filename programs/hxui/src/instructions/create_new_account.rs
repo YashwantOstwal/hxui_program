@@ -25,21 +25,17 @@ pub struct CreateNewAccount<'info>{
 }
 pub  fn create(ctx:Context<CreateNewAccount>)->Result<()>{
 
-    if ctx.accounts.receipt.owner == ctx.program_id {
     let receipt = &mut ctx.accounts.receipt;
+    if receipt.owner == ctx.program_id {
 
     let mut data = receipt.try_borrow_mut_data()?;
         
-        // Use Anchor's internal helper to deserialize 
-        // We wrap in a scope or use a closure to ensure the borrow is dropped if needed
         let mut account_data: Schema = AccountDeserialize::try_deserialize(&mut &data[..])?;
         
         account_data.votes+=1;
-
-        // Write the updated struct back into the account data
         account_data.try_serialize(&mut &mut data[..])?;
     }else {
-    let receipt = &mut ctx.accounts.receipt;
+    // let receipt = &mut ctx.accounts.receipt;
 
     let pda_seeds:&[&[u8]] = &[b"hxui_new_account",&[ctx.bumps.receipt]];
     let vault_seeds:&[&[u8]] = &[b"hxui_vault",&[ctx.bumps.vault]];
@@ -58,16 +54,12 @@ pub  fn create(ctx:Context<CreateNewAccount>)->Result<()>{
 
          let mut data = receipt.try_borrow_mut_data()?;
     
-    // Create an instance of your Schema
     let state = Schema {
-        id:7,votes:0 // Set your ID here
+        id:7,votes:0 
     };
 
-    // Write the 8-byte discriminator
     let discriminator: &[u8] = Schema::DISCRIMINATOR;
     data[..8].copy_from_slice(&discriminator);
-
-    // Serialize the struct into the remaining space (starting at index 8)
     state.serialize(&mut &mut data[8..])?;
     }
 
