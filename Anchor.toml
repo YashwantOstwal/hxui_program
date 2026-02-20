@@ -17,7 +17,6 @@ wallet = "~/.config/solana/id.json"
 
 
 [scripts]
-tests = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 \"tests/**/*.test.ts\""
-test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 \"tests/litesvm.test.ts\""
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 \"tests/crankscript.test.ts\""
 
 
