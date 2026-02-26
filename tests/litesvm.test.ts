@@ -18,18 +18,17 @@ import {
   TransactionInstruction,
   type AccountInfo,
 } from "@solana/web3.js";
-import assert, { Assert } from "assert";
-import bs58 from "bs58";
+import assert from "assert";
 import {
   FailedTransactionMetadata,
   LiteSVM,
   TransactionMetadata,
 } from "litesvm";
+//@ts-ignore
 import IDL from "../target/idl/hxui.json" with { type: "json" };
 import { SYSTEM_PROGRAM_ID } from "@coral-xyz/anchor/dist/cjs/native/system.js";
-import { triggerAsyncId } from "async_hooks";
 
-const FREE_TOKENS_MINT_AMOUNT = 4;
+const FREE_TOKENS_MINT_AMOUNT = 1;
 const FREE_TOKENS_PER_EPOCH = 100;
 const svm = new LiteSVM();
 const programId = new PublicKey(IDL.address);
@@ -37,11 +36,19 @@ const payer = new Keypair();
 svm.airdrop(payer.publicKey, BigInt(LAMPORTS_PER_SOL));
 
 const coder = new anchor.BorshCoder(IDL as anchor.Idl);
-const programPath = new URL("../target/deploy/hxui.so", import.meta.url)
-  .pathname;
+const programPath = new URL(
+  "../target/deploy/hxui.so",
+  //@ts-ignore
+  import.meta.url,
+).pathname;
 svm.addProgramFromFile(programId, programPath);
 const price_per_token = new anchor.BN(0.001 * LAMPORTS_PER_SOL);
 const tokens_per_vote = new anchor.BN(2);
+const hxui_metadata = {
+  name: "100xui",
+  symbol: "HXUI",
+  uri: "https://raw.githubusercontent.com/solana-developers/opos-asset/main/assets/DeveloperPortal/metadata.json",
+} as const;
 
 const admin = new Keypair();
 
@@ -109,6 +116,8 @@ describe("1) initialise_dapp instruction testing", () => {
     const data = coder.instruction.encode("initialise_dapp", {
       price_per_token,
       tokens_per_vote,
+      // hxui_metadata,
+      // hxui_lite_metadata: hxui_metadata,
     });
     const ix = new TransactionInstruction({
       programId,
@@ -147,7 +156,7 @@ describe("1) initialise_dapp instruction testing", () => {
       data,
     });
 
-    sendTransaction([ix], [admin]);
+    sendTransaction([ix], [admin], { logIfFailed: true });
 
     const hxuiConfigAccount = svm.getAccount(getPda(SEEDS.hxuiConfig).address);
     const hxuiConfigData = coder.accounts.decode(
@@ -171,6 +180,8 @@ describe("1) initialise_dapp instruction testing", () => {
     const data = coder.instruction.encode("initialise_dapp", {
       price_per_token,
       tokens_per_vote,
+      hxui_metadata,
+      hxui_lite_metadata: hxui_metadata,
     });
     const ix = new TransactionInstruction({
       programId,
@@ -356,64 +367,64 @@ describe("2) Poll creation testing", () => {
       assert(false);
     }
   });
-  // it("2.5) Attempt to create a new poll even after the poll has ended but the winner is not drawn yet. FAILS", () => {
-  //   let clock = svm.getClock();
-  //   clock.unixTimestamp = clock.unixTimestamp + BigInt(7 * 86400 + 1); // Time travelling to the next second after the end of poll.
-  //   svm.setClock(clock);
+  it("2.5) Attempt to create a new poll even after the poll has ended but the winner is not drawn yet. FAILS", () => {
+    let clock = svm.getClock();
+    clock.unixTimestamp = clock.unixTimestamp + BigInt(7 * 86400 + 1); // Time travelling to the next second after the end of poll.
+    svm.setClock(clock);
 
-  //   const pollAccount = svm.getAccount(getPda(SEEDS.hxuiPoll).address);
-  //   const pollAccountData = coder.accounts.decode(
-  //     "Poll",
-  //     Buffer.from(pollAccount.data),
-  //   );
+    const pollAccount = svm.getAccount(getPda(SEEDS.hxuiPoll).address);
+    const pollAccountData = coder.accounts.decode(
+      "Poll",
+      Buffer.from(pollAccount.data),
+    );
 
-  //   // Ensuring the poll has ended.
-  //   assert(
-  //     clock.unixTimestamp > pollAccountData.current_poll_deadline.toNumber(),
-  //   );
+    // Ensuring the poll has ended.
+    assert(
+      clock.unixTimestamp > pollAccountData.current_poll_deadline.toNumber(),
+    );
 
-  //   const now = clock.unixTimestamp;
-  //   const poll_deadline = new anchor.BN(now + BigInt(86400 * 7));
-  //   const data = coder.instruction.encode("create_poll", {
-  //     poll_deadline,
-  //   });
+    const now = clock.unixTimestamp;
+    const poll_deadline = new anchor.BN(now + BigInt(86400 * 7));
+    const data = coder.instruction.encode("create_poll", {
+      poll_deadline,
+    });
 
-  //   const ix = new TransactionInstruction({
-  //     programId,
-  //     keys: [
-  //       {
-  //         pubkey: adminPubkey,
-  //         isSigner: true,
-  //         isWritable: true,
-  //       },
-  //       {
-  //         pubkey: getPda(SEEDS.hxuiConfig).address,
-  //         isSigner: false,
-  //         isWritable: false,
-  //       },
-  //       {
-  //         pubkey: getPda(SEEDS.hxuiPoll).address,
-  //         isSigner: false,
-  //         isWritable: true,
-  //       },
-  //       { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false },
-  //     ],
-  //     data,
-  //   });
+    const ix = new TransactionInstruction({
+      programId,
+      keys: [
+        {
+          pubkey: adminPubkey,
+          isSigner: true,
+          isWritable: true,
+        },
+        {
+          pubkey: getPda(SEEDS.hxuiConfig).address,
+          isSigner: false,
+          isWritable: false,
+        },
+        {
+          pubkey: getPda(SEEDS.hxuiPoll).address,
+          isSigner: false,
+          isWritable: true,
+        },
+        { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false },
+      ],
+      data,
+    });
 
-  //   const tx = new Transaction().add(ix);
-  //   tx.feePayer = payer.publicKey;
-  //   tx.recentBlockhash = svm.latestBlockhash();
-  //   tx.sign(payer, admin);
-  //   const failed = svm.sendTransaction(tx);
-  //   svm.expireBlockhash();
+    const tx = new Transaction().add(ix);
+    tx.feePayer = payer.publicKey;
+    tx.recentBlockhash = svm.latestBlockhash();
+    tx.sign(payer, admin);
+    const failed = svm.sendTransaction(tx);
+    svm.expireBlockhash();
 
-  //   if (failed instanceof FailedTransactionMetadata) {
-  //     assert(failed.meta().logs()[2].search("WinnerNotDrawn.") != -1);
-  //   } else {
-  //     assert(false);
-  //   }
-  // });
+    if (failed instanceof FailedTransactionMetadata) {
+      assert(failed.meta().logs()[2].search("WinnerNotDrawn.") != -1);
+    } else {
+      assert(false);
+    }
+  });
 
   it(" Winner for current poll is drawn");
   it(
@@ -428,397 +439,408 @@ const [mintedTimestampAddressForAdmin, mintedTimestampBump] =
     programId,
   );
 
-// describe("4) Testing 4", () => {
-//   const adminHxuiLiteTokenAddress = getHxuiLiteTokenAddress(adminPubkey);
-//   it("4.1) Registration for minting free HXUILite tokens without an HXUILite Tokena account. for admin", () => {
-//     //associated token account does not exist
-//     const tokenAccount = svm.getAccount(adminHxuiLiteTokenAddress);
-//     assert.equal(
-//       tokenAccount,
-//       null,
-//       "HXUILite token account owned by admin exists.",
-//     );
+describe("4) Testing 4", () => {
+  const adminHxuiLiteTokenAddress = getHxuiLiteTokenAddress(adminPubkey);
+  it("4.1) Registration for minting free HXUILite tokens without an HXUILite Tokena account. for admin", () => {
+    //associated token account does not exist
+    const tokenAccount = svm.getAccount(adminHxuiLiteTokenAddress);
+    assert.equal(
+      tokenAccount,
+      null,
+      "HXUILite token account owned by admin exists.",
+    );
 
-//     const adminBalanceBefore = svm.getBalance(adminPubkey);
+    const adminBalanceBefore = svm.getBalance(adminPubkey);
 
-//     const ix = getRegisterForFreeTokensInstruction({ for: adminPubkey });
+    const ix = getRegisterForFreeTokensInstruction({ for: adminPubkey });
 
-//     const tx = new Transaction().add(ix);
-//     tx.feePayer = payer.publicKey;
-//     tx.recentBlockhash = svm.latestBlockhash();
-//     tx.sign(payer, admin);
-//     const status = svm.sendTransaction(tx);
+    const tx = new Transaction().add(ix);
+    tx.feePayer = payer.publicKey;
+    tx.recentBlockhash = svm.latestBlockhash();
+    tx.sign(payer, admin);
+    const status = svm.sendTransaction(tx);
 
-//     if (status instanceof FailedTransactionMetadata) {
-//       assert(false);
-//     } else {
-//       assert(true);
-//     }
+    if (status instanceof FailedTransactionMetadata) {
+      assert(false);
+    } else {
+      assert(true);
+    }
 
-//     const adminBalanceAfter = svm.getBalance(adminPubkey);
+    const adminBalanceAfter = svm.getBalance(adminPubkey);
 
-//     const mintedTimestampAccount = svm.getAccount(
-//       mintedTimestampAddressForAdmin,
-//     );
+    const mintedTimestampAccount = svm.getAccount(
+      mintedTimestampAddressForAdmin,
+    );
 
-//     assert.equal(
-//       mintedTimestampAccount.lamports,
-//       adminBalanceBefore - adminBalanceAfter,
-//     );
+    assert.equal(
+      mintedTimestampAccount.lamports,
+      adminBalanceBefore - adminBalanceAfter,
+    );
 
-//     const mintedTimestampAccountData = coder.accounts.decode(
-//       "FreeTokenTimestamp",
-//       Buffer.from(mintedTimestampAccount.data),
-//     );
+    const mintedTimestampAccountData = coder.accounts.decode(
+      "FreeTokenTimestamp",
+      Buffer.from(mintedTimestampAccount.data),
+    );
 
-//     assert.equal(mintedTimestampAccountData.next_mintable_timestamp, 0);
-//     assert.equal(mintedTimestampAccountData.closable_timestamp, 0);
-//     assert.equal(mintedTimestampAccountData.bump, mintedTimestampBump);
-//   });
+    assert.equal(mintedTimestampAccountData.next_mintable_timestamp, 0);
+    assert.equal(mintedTimestampAccountData.closable_timestamp, 0);
+    assert.equal(mintedTimestampAccountData.bump, mintedTimestampBump);
+  });
 
-//   it("4.3) Attempt to Mint free token without an associated token account for admin. FAILS", () => {
-//     const ix = getMintFreeTokensInstruction({ to: adminPubkey });
-//     const failed = sendTransaction([ix], [liteAuthority]);
+  it("4.3) Attempt to Mint free token without an associated token account for admin. FAILS", () => {
+    const ix = getMintFreeTokensInstruction({ to: adminPubkey });
+    const failed = sendTransaction([ix], [liteAuthority]);
 
-//     if (failed instanceof FailedTransactionMetadata) {
-//       assert(failed.meta().logs()[2].search("AccountNotInitialized.") != -1);
-//     } else {
-//       assert(false);
-//     }
-//   });
-//   it("4.4) Mint free token after creating an associated token account for admin. PASSES", () => {
-//     const creationIx = createAssociatedTokenAccountInstruction(
-//       adminPubkey,
-//       getHxuiLiteTokenAddress(adminPubkey),
-//       adminPubkey,
-//       getPda(SEEDS.hxuiLiteMint).address,
-//       TOKEN_2022_PROGRAM_ID,
-//     );
+    if (failed instanceof FailedTransactionMetadata) {
+      assert(failed.meta().logs()[2].search("AccountNotInitialized.") != -1);
+    } else {
+      assert(false);
+    }
+  });
+  it("4.4) Mint free token after creating an associated token account for admin. PASSES", () => {
+    const creationIx = createAssociatedTokenAccountInstruction(
+      adminPubkey,
+      getHxuiLiteTokenAddress(adminPubkey),
+      adminPubkey,
+      getPda(SEEDS.hxuiLiteMint).address,
+      TOKEN_2022_PROGRAM_ID,
+    );
 
-//     const mintIx = getMintFreeTokensInstruction({ to: adminPubkey });
+    const mintIx = getMintFreeTokensInstruction({ to: adminPubkey });
 
-//     const freeTokensCounterDataBefore = getFreeTokensCounterAccount();
-//     sendTransaction([creationIx, mintIx], [admin, liteAuthority]);
-//     const freeTokensCounterDataAfter = getFreeTokensCounterAccount();
+    const freeTokensCounterDataBefore = getFreeTokensCounterAccount();
+    sendTransaction([creationIx, mintIx], [admin, liteAuthority]);
+    const freeTokensCounterDataAfter = getFreeTokensCounterAccount();
 
-//     assert(
-//       freeTokensCounterDataBefore.remaining_free_tokens
-//         .sub(freeTokensCounterDataAfter.remaining_free_tokens)
-//         .eq(new anchor.BN(FREE_TOKENS_MINT_AMOUNT)),
-//       "lo",
-//     );
-//     // advance checking if is_new_epoch.
+    assert(
+      freeTokensCounterDataBefore.remaining_free_tokens
+        .sub(freeTokensCounterDataAfter.remaining_free_tokens)
+        .eq(new anchor.BN(FREE_TOKENS_MINT_AMOUNT)),
+    );
+    // TODO: if is_new_epoch.
 
-//     const adminTokenAccount = svm.getAccount(adminHxuiLiteTokenAddress);
+    const adminTokenAccount = svm.getAccount(adminHxuiLiteTokenAddress);
 
-//     assert.notEqual(adminTokenAccount, null);
+    assert.notEqual(adminTokenAccount, null);
 
-//     // owner program is token 2022.
-//     assert(adminTokenAccount.owner.equals(TOKEN_2022_PROGRAM_ID));
+    // owner program is token 2022.
+    assert(adminTokenAccount.owner.equals(TOKEN_2022_PROGRAM_ID));
 
-//     const tokenState = getHxuiLiteAccount(adminPubkey);
+    const tokenState = getHxuiLiteAccount(adminPubkey);
 
-//     //  Admin is the owner
-//     assert(tokenState.owner.equals(admin.publicKey));
+    //  Admin is the owner
+    assert(tokenState.owner.equals(admin.publicKey));
 
-//     // the token balance is 0n
-//     assert.equal(tokenState.amount, BigInt(FREE_TOKENS_MINT_AMOUNT));
+    // the token balance is 0n
+    assert.equal(tokenState.amount, BigInt(FREE_TOKENS_MINT_AMOUNT));
 
-//     const mintedTimestampAccount = svm.getAccount(
-//       mintedTimestampAddressForAdmin,
-//     );
-//     const mintedTimestampAccountData = coder.accounts.decode(
-//       "FreeTokenTimestamp",
-//       Buffer.from(mintedTimestampAccount.data),
-//     );
+    const mintedTimestampAccount = svm.getAccount(
+      mintedTimestampAddressForAdmin,
+    );
+    const mintedTimestampAccountData = coder.accounts.decode(
+      "FreeTokenTimestamp",
+      Buffer.from(mintedTimestampAccount.data),
+    );
 
-//     const now = svm.getClock().unixTimestamp;
-//     assert(
-//       mintedTimestampAccountData.next_mintable_timestamp.eq(
-//         new anchor.BN(now + BigInt(43200)),
-//       ),
-//     );
-//     assert(mintedTimestampAccountData.closable_timestamp.eq(new anchor.BN(0)));
-//     assert.equal(mintedTimestampAccountData.bump, mintedTimestampBump);
-//   });
-//   it("4.5) Attempt to Mint free token to admin before cooldown. FAILS", () => {
-//     // token account exists.
-//     const ix = getMintFreeTokensInstruction({ to: adminPubkey });
-//     const failed = sendTransaction([ix], [liteAuthority]);
+    const now = svm.getClock().unixTimestamp;
+    assert(
+      mintedTimestampAccountData.next_mintable_timestamp.eq(
+        new anchor.BN(now + BigInt(43200)),
+        "lorem",
+      ),
+    );
+    assert(
+      mintedTimestampAccountData.closable_timestamp.eq(new anchor.BN(0)),
+      "lorem2",
+    );
+    assert.equal(
+      mintedTimestampAccountData.bump,
+      mintedTimestampBump,
+      "lorem232",
+    );
+  });
+  it("4.5) Attempt to Mint free token to admin before cooldown. FAILS", () => {
+    // token account exists.
+    const ix = getMintFreeTokensInstruction({ to: adminPubkey });
+    const failed = sendTransaction([ix], [liteAuthority]);
 
-//     if (failed instanceof FailedTransactionMetadata) {
-//       assert(failed.meta().logs()[2].search("RateLimitExceeded.") != -1);
-//     } else {
-//       assert(false);
-//     }
-//   });
-//   it("4.6) Attempt to claim back the rent before unregistering", () => {
-//     const ix = getClaimRegistrationFeesInstruction({ for: adminPubkey });
-//     const failed = sendTransaction([ix], [admin]);
+    if (failed instanceof FailedTransactionMetadata) {
+      assert(failed.meta().logs()[2].search("RateLimitExceeded.") != -1);
+    } else {
+      assert(false);
+    }
+  });
+  it("4.6) Attempt to claim back the rent before unregistering", () => {
+    const ix = getClaimRegistrationFeesInstruction({ for: adminPubkey });
+    const failed = sendTransaction([ix], [admin]);
 
-//     assertTxFailedWithErrorCode(failed, "UnregisterFirst");
-//   });
-//   it("4.7) Trigger Unregister for admin before cooldown ", () => {
-//     const ix = getUnregisterForFreeTokensInstruction({ for: adminPubkey });
-//     const failed = sendTransaction([ix], [admin]);
-//     if (failed instanceof FailedTransactionMetadata) {
-//       console.log(failed.meta().logs());
-//     }
+    assertTxFailedWithErrorCode(failed, "UnregisterFirst");
+  });
+  it("4.7) Trigger Unregister for admin before cooldown ", () => {
+    const ix = getUnregisterForFreeTokensInstruction({ for: adminPubkey });
+    const failed = sendTransaction([ix], [admin]);
+    if (failed instanceof FailedTransactionMetadata) {
+      console.log(failed.meta().logs());
+    }
 
-//     const mintedTimestampAccount = svm.getAccount(
-//       mintedTimestampAddressForAdmin,
-//     );
-//     const mintedTimestampAccountData = coder.accounts.decode(
-//       "FreeTokenTimestamp",
-//       Buffer.from(mintedTimestampAccount.data),
-//     );
+    const mintedTimestampAccount = svm.getAccount(
+      mintedTimestampAddressForAdmin,
+    );
+    const mintedTimestampAccountData = coder.accounts.decode(
+      "FreeTokenTimestamp",
+      Buffer.from(mintedTimestampAccount.data),
+    );
 
-//     const now = svm.getClock().unixTimestamp;
-//     assert(
-//       mintedTimestampAccountData.next_mintable_timestamp.eq(
-//         new anchor.BN(now + BigInt(43200)),
-//       ),
-//     );
+    const now = svm.getClock().unixTimestamp;
+    assert(
+      mintedTimestampAccountData.next_mintable_timestamp.eq(
+        new anchor.BN(now + BigInt(43200)),
+      ),
+    );
 
-//     // One can close this account and claim back the rent after the cooldown.
-//     assert(
-//       mintedTimestampAccountData.closable_timestamp.eq(
-//         new anchor.BN(mintedTimestampAccountData.next_mintable_timestamp),
-//       ),
-//     );
-//   });
+    // One can close this account and claim back the rent after the cooldown.
+    assert(
+      mintedTimestampAccountData.closable_timestamp.eq(
+        new anchor.BN(mintedTimestampAccountData.next_mintable_timestamp),
+      ),
+    );
+  });
 
-//   it("4.8) Attempt to mint new tokens after unregistering. FAILS", () => {
-//     const ix = getMintFreeTokensInstruction({ to: adminPubkey });
-//     const failed = sendTransaction([ix], [liteAuthority]);
+  it("4.8) Attempt to mint new tokens after unregistering. FAILS", () => {
+    const ix = getMintFreeTokensInstruction({ to: adminPubkey });
+    const failed = sendTransaction([ix], [liteAuthority]);
 
-//     assertTxFailedWithErrorCode(failed, "UnregisteredFreeTokens");
-//   });
-//   it("4.9) Attempt to Claim rent after unregistering but before closable time.", async () => {
-//     //Closable time in this situation is last minted time + 12 hours.
-//     const data = coder.instruction.encode("claim_registration_fees", {});
-//     const ix = new TransactionInstruction({
-//       programId,
-//       keys: [
-//         { pubkey: adminPubkey, isSigner: true, isWritable: true },
-//         {
-//           pubkey: mintedTimestampAddressForAdmin,
-//           isSigner: false,
-//           isWritable: true,
-//         },
-//       ],
-//       data,
-//     });
+    assertTxFailedWithErrorCode(failed, "UnregisteredForFreeTokens.");
+  });
+  it("4.9) Attempt to Claim rent after unregistering but before closable time.", async () => {
+    //Closable time in this situation is last minted time + 12 hours.
+    const data = coder.instruction.encode("claim_registration_fees", {});
+    const ix = new TransactionInstruction({
+      programId,
+      keys: [
+        { pubkey: adminPubkey, isSigner: true, isWritable: true },
+        {
+          pubkey: mintedTimestampAddressForAdmin,
+          isSigner: false,
+          isWritable: true,
+        },
+      ],
+      data,
+    });
 
-//     const failed = sendTransaction([ix], [admin]);
+    const failed = sendTransaction([ix], [admin]);
 
-//     assertTxFailedWithErrorCode(failed, "UnregisterFirst");
-//   });
+    assertTxFailedWithErrorCode(failed, "UnclaimableYet.");
+  });
 
-//   it("4.10) Cancel unregister", async () => {
-//     const data = coder.instruction.encode(
-//       "cancel_unregister_for_free_tokens",
-//       {},
-//     );
-//     const ix = new TransactionInstruction({
-//       programId,
-//       keys: [
-//         { pubkey: adminPubkey, isSigner: true, isWritable: false },
-//         {
-//           pubkey: mintedTimestampAddressForAdmin,
-//           isSigner: false,
-//           isWritable: true,
-//         },
-//       ],
-//       data,
-//     });
+  it("4.10) Cancel unregister", async () => {
+    const data = coder.instruction.encode(
+      "cancel_unregister_for_free_tokens",
+      {},
+    );
+    const ix = new TransactionInstruction({
+      programId,
+      keys: [
+        { pubkey: adminPubkey, isSigner: true, isWritable: false },
+        {
+          pubkey: mintedTimestampAddressForAdmin,
+          isSigner: false,
+          isWritable: true,
+        },
+      ],
+      data,
+    });
 
-//     sendTransaction([ix], [admin]);
+    sendTransaction([ix], [admin]);
 
-//     const mintedTimestampAccount = svm.getAccount(
-//       mintedTimestampAddressForAdmin,
-//     );
-//     const mintedTimestampAccountData = coder.accounts.decode(
-//       "FreeTokenTimestamp",
-//       Buffer.from(mintedTimestampAccount.data),
-//     );
-//     assert(mintedTimestampAccountData.closable_timestamp.eq(new anchor.BN(0)));
-//   });
-//   it("4.11) Mint free tokens to admin token account after cooldown", () => {
-//     const now = svm.getClock();
-//     now.unixTimestamp = now.unixTimestamp + BigInt(43200);
-//     svm.setClock(now); // time travelling ahead to the time where the admin can mint new tokens.
-//     const ix = getMintFreeTokensInstruction({ to: adminPubkey });
+    const mintedTimestampAccount = svm.getAccount(
+      mintedTimestampAddressForAdmin,
+    );
+    const mintedTimestampAccountData = coder.accounts.decode(
+      "FreeTokenTimestamp",
+      Buffer.from(mintedTimestampAccount.data),
+    );
+    assert(mintedTimestampAccountData.closable_timestamp.eq(new anchor.BN(0)));
+  });
+  it("4.11) Mint free tokens to admin token account after cooldown", () => {
+    const now = svm.getClock();
+    now.unixTimestamp = now.unixTimestamp + BigInt(43200);
+    svm.setClock(now); // time travelling ahead to the time where the admin can mint new tokens.
+    const ix = getMintFreeTokensInstruction({ to: adminPubkey });
 
-//     const tokenStateBefore = getHxuiLiteAccount(adminPubkey);
-//     const freeTokensCounterDataBefore = getFreeTokensCounterAccount();
-//     sendTransaction([ix], [liteAuthority]);
+    const tokenStateBefore = getHxuiLiteAccount(adminPubkey);
+    const freeTokensCounterDataBefore = getFreeTokensCounterAccount();
+    sendTransaction([ix], [liteAuthority]);
 
-//     const tokenStateAfter = getHxuiLiteAccount(adminPubkey);
-//     const freeTokensCounterDataAfter = getFreeTokensCounterAccount();
+    const tokenStateAfter = getHxuiLiteAccount(adminPubkey);
+    const freeTokensCounterDataAfter = getFreeTokensCounterAccount();
 
-//     assert.equal(
-//       tokenStateAfter.amount - tokenStateBefore.amount,
-//       BigInt(FREE_TOKENS_MINT_AMOUNT),
-//     );
-//     assert(
-//       freeTokensCounterDataBefore.remaining_free_tokens
-//         .sub(freeTokensCounterDataAfter.remaining_free_tokens)
-//         .eq(new anchor.BN(FREE_TOKENS_MINT_AMOUNT)),
-//     );
+    assert.equal(
+      tokenStateAfter.amount - tokenStateBefore.amount,
+      BigInt(FREE_TOKENS_MINT_AMOUNT),
+    );
+    assert(
+      freeTokensCounterDataBefore.remaining_free_tokens
+        .sub(freeTokensCounterDataAfter.remaining_free_tokens)
+        .eq(new anchor.BN(FREE_TOKENS_MINT_AMOUNT)),
+    );
 
-//     const mintedTimestampAccount = svm.getAccount(
-//       mintedTimestampAddressForAdmin,
-//     );
-//     const mintedTimestampAccountData = coder.accounts.decode(
-//       "FreeTokenTimestamp",
-//       Buffer.from(mintedTimestampAccount.data),
-//     );
+    const mintedTimestampAccount = svm.getAccount(
+      mintedTimestampAddressForAdmin,
+    );
+    const mintedTimestampAccountData = coder.accounts.decode(
+      "FreeTokenTimestamp",
+      Buffer.from(mintedTimestampAccount.data),
+    );
 
-//     assert(
-//       mintedTimestampAccountData.next_mintable_timestamp.eq(
-//         new anchor.BN(now.unixTimestamp + BigInt(43200)),
-//       ),
-//     );
-//     assert(mintedTimestampAccountData.closable_timestamp.eq(new anchor.BN(0)));
-//   });
+    assert(
+      mintedTimestampAccountData.next_mintable_timestamp.eq(
+        new anchor.BN(now.unixTimestamp + BigInt(43200)),
+      ),
+    );
+    assert(mintedTimestampAccountData.closable_timestamp.eq(new anchor.BN(0)));
+  });
 
-//   it("4.12) Unregister after cooldown allows to claim registration fees immediately", async () => {
-//     const now = svm.getClock();
-//     now.unixTimestamp = now.unixTimestamp + BigInt(43200);
-//     svm.setClock(now);
-//     const unregisterIx = getUnregisterForFreeTokensInstruction({
-//       for: adminPubkey,
-//     });
-//     const claimRegistrationFeesIx = getClaimRegistrationFeesInstruction({
-//       for: adminPubkey,
-//     });
+  it("4.12) Unregister after cooldown allows to claim registration fees immediately", async () => {
+    const now = svm.getClock();
+    now.unixTimestamp = now.unixTimestamp + BigInt(43200);
+    svm.setClock(now);
+    const unregisterIx = getUnregisterForFreeTokensInstruction({
+      for: adminPubkey,
+    });
+    const claimRegistrationFeesIx = getClaimRegistrationFeesInstruction({
+      for: adminPubkey,
+    });
 
-//     const mintedTimestampAccountBalance = svm.getBalance(
-//       mintedTimestampAddressForAdmin,
-//     );
-//     const adminBalanceBefore = svm.getBalance(adminPubkey);
-//     sendTransaction([unregisterIx, claimRegistrationFeesIx], [admin]);
-//     const adminBalanceAfter = svm.getBalance(adminPubkey);
+    const mintedTimestampAccountBalance = svm.getBalance(
+      mintedTimestampAddressForAdmin,
+    );
+    const adminBalanceBefore = svm.getBalance(adminPubkey);
+    sendTransaction([unregisterIx, claimRegistrationFeesIx], [admin]);
+    const adminBalanceAfter = svm.getBalance(adminPubkey);
 
-//     assert.equal(
-//       adminBalanceAfter - adminBalanceBefore,
-//       mintedTimestampAccountBalance,
-//     );
-//   });
-//   it("4.13) Attempt to mint more free tokens than can be minted per epoch", async () => {
-//     // Situation when more users attempt to mint free tokens than can be minted.
+    assert.equal(
+      adminBalanceAfter - adminBalanceBefore,
+      mintedTimestampAccountBalance,
+    );
+  });
+  it("4.13) Attempt to mint more free tokens than can be minted per epoch", async () => {
+    // Situation when more users attempt to mint free tokens than can be minted.
 
-//     const freeTokensCounter = getFreeTokensCounterAccount();
-//     const buffer = Math.floor(Math.random() * 3);
-//     // attempt to mint free tokens for more users than can be minted for.
-//     for (
-//       let i = 0;
-//       i <=
-//       freeTokensCounter.remaining_free_tokens.toNumber() /
-//         FREE_TOKENS_MINT_AMOUNT +
-//         buffer;
-//       i++
-//     ) {
-//       const user = new Keypair();
-//       svm.airdrop(user.publicKey, BigInt(0.01 * LAMPORTS_PER_SOL));
+    const freeTokensCounter = getFreeTokensCounterAccount();
+    const buffer = Math.floor(Math.random() * 3);
+    // attempt to mint free tokens for more users than can be minted for.
+    for (
+      let i = 0;
+      i <=
+      freeTokensCounter.remaining_free_tokens.toNumber() /
+        FREE_TOKENS_MINT_AMOUNT +
+        buffer;
+      i++
+    ) {
+      const user = new Keypair();
+      svm.airdrop(user.publicKey, BigInt(0.01 * LAMPORTS_PER_SOL));
 
-//       const tokenCreationIx = createAssociatedTokenAccountInstruction(
-//         user.publicKey,
-//         getHxuiLiteTokenAddress(user.publicKey),
-//         user.publicKey,
-//         getPda(SEEDS.hxuiLiteMint).address,
-//         TOKEN_2022_PROGRAM_ID,
-//       );
+      const tokenCreationIx = createAssociatedTokenAccountInstruction(
+        user.publicKey,
+        getHxuiLiteTokenAddress(user.publicKey),
+        user.publicKey,
+        getPda(SEEDS.hxuiLiteMint).address,
+        TOKEN_2022_PROGRAM_ID,
+      );
 
-//       const registerIx = getRegisterForFreeTokensInstruction({ for: user.publicKey });
-//       const mintIx = getMintFreeTokensInstruction({ to: user.publicKey });
+      const registerIx = getRegisterForFreeTokensInstruction({
+        for: user.publicKey,
+      });
+      const mintIx = getMintFreeTokensInstruction({ to: user.publicKey });
 
-//       const metadata = sendTransaction(
-//         [registerIx, tokenCreationIx, mintIx],
-//         [user, liteAuthority],
-//       );
+      const metadata = sendTransaction(
+        [registerIx, tokenCreationIx, mintIx],
+        [user, liteAuthority],
+      );
 
-//       if (metadata instanceof FailedTransactionMetadata) {
-//         assertTxFailedWithErrorCode(metadata, "AllFreeTokensForTheDayMinted");
-//         // minting will fail from x+1 user if x are the tokens that can be minted.
-//         assert(
-//           i >=
-//             Math.floor(
-//               freeTokensCounter.remaining_free_tokens.toNumber() /
-//                 FREE_TOKENS_MINT_AMOUNT,
-//             ),
-//           "b",
-//         );
-//       } else {
-//         assert(
-//           i <
-//             Math.floor(
-//               freeTokensCounter.remaining_free_tokens.toNumber() /
-//                 FREE_TOKENS_MINT_AMOUNT,
-//             ),
-//           "a",
-//         );
-//         const tokenAccount = getHxuiLiteAccount(user.publicKey);
-//         assert.equal(tokenAccount.amount, BigInt(FREE_TOKENS_MINT_AMOUNT));
-//       }
-//     }
-//   }).slow(5000);
-//   it("Free tokens can be minted to users from the next epoch", () => {
-//     const freeTokensCounter = getFreeTokensCounterAccount();
+      if (metadata instanceof FailedTransactionMetadata) {
+        assertTxFailedWithErrorCode(metadata, "AllFreeTokensForTheDayMinted");
+        // minting will fail from x+1 user if x are the tokens that can be minted.
+        assert(
+          i >=
+            Math.floor(
+              freeTokensCounter.remaining_free_tokens.toNumber() /
+                FREE_TOKENS_MINT_AMOUNT,
+            ),
+          "b",
+        );
+      } else {
+        assert(
+          i <
+            Math.floor(
+              freeTokensCounter.remaining_free_tokens.toNumber() /
+                FREE_TOKENS_MINT_AMOUNT,
+            ),
+          "a",
+        );
+        const tokenAccount = getHxuiLiteAccount(user.publicKey);
+        assert.equal(tokenAccount.amount, BigInt(FREE_TOKENS_MINT_AMOUNT));
+      }
+    }
+  }).slow(5000);
+  it("Free tokens can be minted to users from the next epoch", () => {
+    const freeTokensCounter = getFreeTokensCounterAccount();
 
-//     //minting have failed in the previous test and will fail when minted in this epoch
-//     assert(
-//       freeTokensCounter.remaining_free_tokens.cmp(
-//         new anchor.BN(FREE_TOKENS_MINT_AMOUNT),
-//       ) == -1,
-//     );
+    //minting have failed in the previous test and will fail when minted in this epoch
+    assert(
+      freeTokensCounter.remaining_free_tokens.cmp(
+        new anchor.BN(FREE_TOKENS_MINT_AMOUNT),
+      ) == -1,
+    );
 
-//     const clock = svm.getClock();
-//     clock.epoch = clock.epoch + BigInt(1);
-//     svm.setClock(clock); // time travel to next epoch
+    const clock = svm.getClock();
+    clock.epoch = clock.epoch + BigInt(1);
+    svm.setClock(clock); // time travel to next epoch
 
-//     const user = new Keypair();
-//     svm.airdrop(user.publicKey, BigInt(0.01 * LAMPORTS_PER_SOL));
+    const user = new Keypair();
+    svm.airdrop(user.publicKey, BigInt(0.01 * LAMPORTS_PER_SOL));
 
-//     const tokenCreationIx = createAssociatedTokenAccountInstruction(
-//       user.publicKey,
-//       getHxuiLiteTokenAddress(user.publicKey),
-//       user.publicKey,
-//       getPda(SEEDS.hxuiLiteMint).address,
-//       TOKEN_2022_PROGRAM_ID,
-//     );
+    const tokenCreationIx = createAssociatedTokenAccountInstruction(
+      user.publicKey,
+      getHxuiLiteTokenAddress(user.publicKey),
+      user.publicKey,
+      getPda(SEEDS.hxuiLiteMint).address,
+      TOKEN_2022_PROGRAM_ID,
+    );
 
-//     const registerIx = getRegisterForFreeTokensInstruction({ for: user.publicKey });
-//     const mintIx = getMintFreeTokensInstruction({ to: user.publicKey });
+    const registerIx = getRegisterForFreeTokensInstruction({
+      for: user.publicKey,
+    });
+    const mintIx = getMintFreeTokensInstruction({ to: user.publicKey });
 
-//     const metadata = sendTransaction(
-//       [registerIx, tokenCreationIx, mintIx],
-//       [user, liteAuthority],
-//     );
+    const metadata = sendTransaction(
+      [registerIx, tokenCreationIx, mintIx],
+      [user, liteAuthority],
+    );
 
-//     if (metadata instanceof FailedTransactionMetadata) {
-//       assert(false);
-//     } else {
-//       assert(true);
-//     }
-//     const freeTokensCounterDataAfter = getFreeTokensCounterAccount();
+    if (metadata instanceof FailedTransactionMetadata) {
+      assert(false);
+    } else {
+      assert(true);
+    }
+    const freeTokensCounterDataAfter = getFreeTokensCounterAccount();
 
-//     assert(
-//       freeTokensCounterDataAfter.remaining_free_tokens.eq(
-//         new anchor.BN(FREE_TOKENS_PER_EPOCH).sub(
-//           new anchor.BN(FREE_TOKENS_MINT_AMOUNT),
-//         ),
-//       ),
-//     );
+    assert(
+      freeTokensCounterDataAfter.remaining_free_tokens.eq(
+        new anchor.BN(FREE_TOKENS_PER_EPOCH).sub(
+          new anchor.BN(FREE_TOKENS_MINT_AMOUNT),
+        ),
+      ),
+    );
 
-//     assert(
-//       freeTokensCounterDataAfter.current_epoch
-//         .sub(freeTokensCounter.current_epoch)
-//         .eq(new anchor.BN(1)),
-//     );
-//   });
-// });
+    assert(
+      freeTokensCounterDataAfter.current_epoch
+        .sub(freeTokensCounter.current_epoch)
+        .eq(new anchor.BN(1)),
+    );
+  });
+});
 const users: Keypair[] = [];
 describe("5) Buying HXUI tokens for users[0]", async () => {
   before(async () => {

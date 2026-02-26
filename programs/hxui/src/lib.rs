@@ -26,11 +26,14 @@ pub mod hxui {
                 price_per_token,
                 tokens_per_vote,
                 bump:config_bump
-            }
+            },
+            // hxui_metadata,
+            // hxui_lite_metadata
         )
 
         
     }
+
     pub fn create_poll(ctx:Context<CreatePoll>,poll_deadline:i64)->Result<()>{
         instructions::create_poll::create_new_poll(ctx, poll_deadline)
     }
@@ -111,7 +114,4 @@ pub fn draw_winner<'info>(ctx:Context<'_, '_, 'info, 'info,PickWinner<'_>>)->Res
         instructions::create_new_account::reset(ctx)
     }
 
-
-
 }
-
