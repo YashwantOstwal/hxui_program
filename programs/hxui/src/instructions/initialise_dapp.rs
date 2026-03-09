@@ -1,4 +1,4 @@
-use anchor_lang::{prelude::*, system_program::{Transfer,transfer,CreateAccount, create_account}};
+use anchor_lang::{prelude::*, system_program::{Transfer,transfer}};
 use anchor_spl::{
     token_interface::{ Mint,Token2022,token_metadata_initialize,TokenMetadataInitialize},
 };
@@ -67,7 +67,6 @@ pub struct InitialiseDapp<'info>{
     pub token_program:Program<'info,Token2022>
 }
 
-// #[derive(AnchorDeserialize,AnchorSerialize)]
 pub struct TokenMetadataArgs {
     name:String,
     symbol:String,

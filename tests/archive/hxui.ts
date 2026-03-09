@@ -2409,24 +2409,6 @@ describe("Advance candidate testing", () => {
   //   }
 });
 
-// describe("temp", () => {
-//   it("", async () => {
-//     await program.methods
-//       .temp()
-//       .accounts({ admin: adminPubkey })
-//       .signers([admin])
-//       .rpc();
-
-//     const [address] = PublicKey.findProgramAddressSync(
-//       [Buffer.from("hxui_tem")],
-//       program.programId,
-//     );
-
-//     const account = await program.account.accountWithEnum.fetch(address);
-//     console.log(!!account.myEnum.monday == false);
-//     console.log(!!account.myEnum.tuesday == true);
-//   });
-// });
 describe("6)Safe withdrawl from the vault ixn testing..", () => {
   async function getMinimumVaultBalance() {
     const mint = await getMint(

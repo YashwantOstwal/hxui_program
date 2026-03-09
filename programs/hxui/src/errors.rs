@@ -109,6 +109,9 @@ pub enum CustomError {
     WaitUntilWithdrawWindowIsClosed,
 
     #[msg("Active candidate cannot open a withdraw window.")]
-    ActiveCandidateCannotOpenWithdrawWindow
+    ActiveCandidateCannotOpenWithdrawWindow,
+
+    #[msg("Cannot set claimable for non active candidate.")]
+    CannotSetClaimableForNonActiveCandidate
 
 }

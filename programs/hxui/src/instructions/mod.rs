@@ -58,5 +58,8 @@ pub use clear_receipt::*;
 pub mod create_new_account;
 pub use create_new_account::*;
 
+pub mod set_claim_back_offer;
+pub use set_claim_back_offer::*;
+
 
 

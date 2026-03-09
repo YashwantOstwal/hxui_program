@@ -6,13 +6,13 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-hxui = "EpF1FNjziFb8wrR1p5usVW1AbcU7saCt8deoiVY31zE7"
+hxui = "GpTybHnUiPQdYE3WnnzDKKpwZ2kWkt651yP9cTfNoyTN"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "localnet"
+cluster = "Localnet"
 wallet = "~/.config/solana/id.json"
 
 

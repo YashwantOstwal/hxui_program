@@ -17,6 +17,7 @@ import {
   Transaction,
   TransactionInstruction,
   type AccountInfo,
+  SystemProgram,
 } from "@solana/web3.js";
 import assert from "assert";
 import {
@@ -24,9 +25,7 @@ import {
   LiteSVM,
   TransactionMetadata,
 } from "litesvm";
-//@ts-ignore
 import IDL from "../target/idl/hxui.json" with { type: "json" };
-import { SYSTEM_PROGRAM_ID } from "@coral-xyz/anchor/dist/cjs/native/system.js";
 
 const FREE_TOKENS_MINT_AMOUNT = 1;
 const FREE_TOKENS_PER_EPOCH = 100;
@@ -150,13 +149,13 @@ describe("1) initialise_dapp instruction testing", () => {
           isSigner: false,
           isWritable: true,
         },
-        { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false },
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
         { pubkey: TOKEN_2022_PROGRAM_ID, isSigner: false, isWritable: false },
       ],
       data,
     });
 
-    sendTransaction([ix], [admin], { logIfFailed: true });
+    sendTransaction([ix], [admin]);
 
     const hxuiConfigAccount = svm.getAccount(getPda(SEEDS.hxuiConfig).address);
     const hxuiConfigData = coder.accounts.decode(
@@ -214,7 +213,7 @@ describe("1) initialise_dapp instruction testing", () => {
           isSigner: false,
           isWritable: true,
         },
-        { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false },
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
         { pubkey: TOKEN_2022_PROGRAM_ID, isSigner: false, isWritable: false },
       ],
       data,
@@ -293,7 +292,7 @@ describe("2) Poll creation testing", () => {
           isSigner: false,
           isWritable: true,
         },
-        { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false },
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       ],
       data,
     });
@@ -407,7 +406,7 @@ describe("2) Poll creation testing", () => {
           isSigner: false,
           isWritable: true,
         },
-        { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false },
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       ],
       data,
     });
@@ -441,7 +440,7 @@ const [mintedTimestampAddressForAdmin, mintedTimestampBump] =
 
 describe("4) Testing 4", () => {
   const adminHxuiLiteTokenAddress = getHxuiLiteTokenAddress(adminPubkey);
-  it("4.1) Registration for minting free HXUILite tokens without an HXUILite Tokena account. for admin", () => {
+  it("4.1) Registration for minting free HXUILite tokens without an HXUILite Token account for a user (admin as user)", () => {
     //associated token account does not exist
     const tokenAccount = svm.getAccount(adminHxuiLiteTokenAddress);
     assert.equal(
@@ -454,17 +453,8 @@ describe("4) Testing 4", () => {
 
     const ix = getRegisterForFreeTokensInstruction({ for: adminPubkey });
 
-    const tx = new Transaction().add(ix);
-    tx.feePayer = payer.publicKey;
-    tx.recentBlockhash = svm.latestBlockhash();
-    tx.sign(payer, admin);
-    const status = svm.sendTransaction(tx);
-
-    if (status instanceof FailedTransactionMetadata) {
-      assert(false);
-    } else {
-      assert(true);
-    }
+    const now = svm.getClock().unixTimestamp;
+    sendTransaction([ix], [admin]);
 
     const adminBalanceAfter = svm.getBalance(adminPubkey);
 
@@ -482,7 +472,7 @@ describe("4) Testing 4", () => {
       Buffer.from(mintedTimestampAccount.data),
     );
 
-    assert.equal(mintedTimestampAccountData.next_mintable_timestamp, 0);
+    assert.equal(mintedTimestampAccountData.next_mintable_timestamp, now);
     assert.equal(mintedTimestampAccountData.closable_timestamp, 0);
     assert.equal(mintedTimestampAccountData.bump, mintedTimestampBump);
   });
@@ -1170,7 +1160,7 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
             votes: new anchor.BN(votes),
           },
         );
-        sendTransaction([ix], [user], { logIfFailed: true });
+        sendTransaction([ix], [user]);
         const vaultBalanceAfter = svm.getBalance(
           getPda(SEEDS.hxuiVault).address,
         );
@@ -1252,7 +1242,7 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
   // activeCandidatesStatus = [active,active,active,active(claimable),active(claimable),active(claimable),active,active]
   // activeCandidateVotesWithReceipts = [1(0),1(1),3(1),0(0),1(1),2(1),0(0),1(1)]
   it("Attempt to close an Active candidate with 0 receipts (eg. activeCandidates[0]).", async () => {
-    // Only a 0 receipt account can be closed. An active account can never be closed even if the receipts is 0
+    // Only a non active 0 receipts account can be closed.
 
     const candidateName = activeCandidates[0].name;
     const candidateState = getCandidateAccount(candidateName);
@@ -1269,9 +1259,24 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
     assertTxFailedWithErrorCode(failed, "ActiveCandidateCannotBeClosed");
   });
 
+  it("5.4)***** Set claimback offer for an active candidate after initialisation", () => {
+    const candidateName = activeCandidates[0].name;
+    const candidateStateBefore = getCandidateAccount(candidateName);
+    assert(
+      candidateStateBefore.candidate_status.Active,
+      "Not an active candidate",
+    );
+
+    assert.equal(candidateStateBefore.claimable_if_winner, false, "1");
+
+    const ix = getClaimbackOfferInstruction({ candidateName });
+    sendTransaction([ix], [admin]);
+    const candidateStateAfter = getCandidateAccount(candidateName);
+    assert.equal(candidateStateAfter.claimable_if_winner, true, "2");
+  });
   // usersHXUITokenBalance = [4,10,0]
   // usersHXUILiteTokenBalance = [2,4,4]
-  // activeCandidatesStatus = [active,active,active,active(claimable),active(claimable),active(claimable),active,active]
+  // activeCandidatesStatus = [active(claimable),active,active,active(claimable),active(claimable),active(claimable),active,active]
   // activeCandidateVotesWithReceipts = [1(0),1(1),3(1),0(0),1(1),2(1),0(0),1(1)]
   it("5.4) Withdraw the first 3 active candidates in activeCandidates.", async () => {
     //Also verified the activeCandidates[0..2] are unclaimble candidates with 0,1,2 votes respectively and are withdrawn.
@@ -1281,7 +1286,6 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
       // const candidateBefore = await program.account.candidate.fetch(
       //   activeCandidate.address,
       // );
-      assert.equal(candidateStateBefore.claimable_if_winner, false);
       assert(candidateStateBefore.candidate_status.Active);
 
       const ix = getWithdrawCandidateInstruction({ candidateName });
@@ -1361,7 +1365,7 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
         ) == -1,
       );
       const ix = getDrawWinnerInstruction(candidates);
-      sendTransaction([ix], [admin], { logIfFailed: true });
+      sendTransaction([ix], [admin]);
 
       const pollAccountAfter = getPollAccount();
       assert.equal(
@@ -1411,7 +1415,7 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
       // creating a new poll to draw more winners, only one winner per poll.
       const pollDeadline = new anchor.BN(now.unixTimestamp + BigInt(7 * 86400));
       const ix2 = getCreatePollInstruction({ pollDeadline });
-      sendTransaction([ix2], [admin], { logIfFailed: true });
+      sendTransaction([ix2], [admin]);
     }
     //Garbage collected.
     // while (activeCandidates.length === 0) {
@@ -1423,28 +1427,757 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
 usersHXUILiteTokenBalance = [2,4,4]
 activeCandidatesStatus = [withdrawn,withdrawn,withdrawn,winner(claimable),winner(claimable),winner(claimable),winner,winner]
 
-
 activeCandidateVotesWithReceipts = [1(0),1(1),3(1),0(0),1(1),2(1),0(0),1(1)] 
 
 newCandidates = {
     claimableWinner:[0(0),1(1),2(1)],
     winner:[0(0),1(1)],
-    withdrawn:[1(0),1(1),2(1)]
+    withdrawn:[1(0),1(1),3(1)]
   }
 newCandidates.claimableWinner[0] means winner with claimable with 0 votes.
-Except -> newCandidates.withdrawn[2] has 3 votes.
+EXCEPT -> newCandidates.withdrawn[2] has 3 votes.
 */
 });
+
+it("Attempt to set claimable winner for non active candidate");
+function checkNonActiveCandidateWith(
+  nonActiveCandidateName: string,
+  expectedState: {
+    while: "before" | "after" | "during";
+    hasZeroReceipts?: boolean;
+  },
+) {
+  const candidateState = getCandidateAccount(nonActiveCandidateName);
+
+  assert(
+    !candidateState.candidate_status.Active,
+    "An active candidate is attempted to close",
+  );
+
+  if (typeof expectedState.hasZeroReceipts == "boolean") {
+    if (expectedState.hasZeroReceipts) {
+      assert.equal(
+        candidateState.total_receipts.isZero(),
+        true,
+        "Candidate has non Zero receipts",
+      );
+    } else {
+      assert.equal(
+        candidateState.total_receipts.isZero(),
+        false,
+        "Candidate has Zero receipts",
+      );
+    }
+  }
+
+  const now = svm.getClock();
+  switch (expectedState.while) {
+    case "before":
+      assert(
+        candidateState.claim_window.eq(new anchor.BN(0)),
+        "Claim window is either live or closed.",
+      );
+      break;
+    case "during":
+      assert(
+        candidateState.claim_window.cmp(new anchor.BN(now.unixTimestamp)) != -1,
+        "Claim window is not yet started or closed",
+      );
+      break;
+
+    case "after":
+      assert.equal(
+        candidateState.claim_window.isZero(),
+        false,
+        "Claim window is not yet opened.",
+      );
+      assert(
+        candidateState.claim_window.cmp(new anchor.BN(now.unixTimestamp)) == -1,
+        "error: Claim window is live.",
+      );
+      break;
+  }
+}
+describe("Advance candidate testing", () => {
+  it("5.6) Cannot Withdraw a Winner or claimable winner candidate", async () => {
+    // Only an active candidate can be withdrawn.
+
+    async function withdrawCandidate(nonActiveCandidateName: string) {
+      const ix = getWithdrawCandidateInstruction({
+        candidateName: nonActiveCandidateName,
+      });
+      const failed = sendTransaction([ix], [admin]);
+      assertTxFailedWithErrorCode(failed, "OnlyActiveCandidateCanBeWithdrawn");
+    }
+    withdrawCandidate(newCandidates.winner[0].name);
+    withdrawCandidate(newCandidates.claimableWinner[0].name);
+  });
+
+  it("5.5) Cannot vote a Non active candidate (eg. Winner (candidates.winner[0]), Claimable Winner (candidates.claimableWinner[0]) or a Withdrawn (candidates.withdrawn[0])", async () => {
+    async function voteANonActiveCandidate(nonActiveCandidateName: string) {
+      const ix = getVoteCandidateWithHxuiLiteInstruction(
+        { owner: users[1].publicKey },
+        { _name: nonActiveCandidateName, votes: new anchor.BN(1) },
+      );
+      const failed = sendTransaction([ix], [users[1]]);
+      assertTxFailedWithErrorCode(failed, "OnlyActiveCandidateCanBeVoted.");
+    }
+
+    voteANonActiveCandidate(newCandidates.winner[0].name);
+    voteANonActiveCandidate(newCandidates.claimableWinner[0].name);
+    voteANonActiveCandidate(newCandidates.withdrawn[0].name);
+  });
+
+  function getClaimTokensInstruction(
+    accounts: Record<"owner", PublicKey>,
+    instructionArgs: { candidateName: string },
+  ) {
+    const { candidateName: _name } = instructionArgs;
+    const data = coder.instruction.encode("claim_tokens", { _name });
+    return new TransactionInstruction({
+      programId,
+      keys: [
+        { pubkey: accounts.owner, isSigner: true, isWritable: false },
+        {
+          pubkey: getHxuiTokenAddress(accounts.owner),
+          isSigner: false,
+          isWritable: true,
+        },
+        {
+          pubkey: getPda(SEEDS.hxuiMint).address,
+          isSigner: false,
+          isWritable: true,
+        },
+        {
+          pubkey: getCandidatePda(_name).address,
+          isSigner: false,
+          isWritable: true,
+        },
+        {
+          pubkey: getPda(SEEDS.hxuiVault).address,
+          isSigner: false,
+          isWritable: true,
+        },
+        {
+          pubkey: getVoteReceiptPda(_name, accounts.owner).address,
+          isSigner: false,
+          isWritable: true,
+        },
+        { pubkey: TOKEN_2022_PROGRAM_ID, isSigner: false, isWritable: false },
+        {
+          pubkey: ASSOCIATED_TOKEN_PROGRAM_ID,
+          isSigner: false,
+          isWritable: false,
+        },
+      ],
+      data,
+    });
+  }
+  function claimTokensForNonActiveCandidate(
+    nonActiveCandidateName: string,
+    owner: Keypair,
+    state: { hasZeroReceipts: boolean; while: "before" | "during" | "after" },
+  ) {
+    checkNonActiveCandidateWith(nonActiveCandidateName, state);
+
+    const voteReceiptAddress = getVoteReceiptPda(
+      nonActiveCandidateName,
+      owner.publicKey,
+    ).address;
+    const voteReceiptInfo = svm.getAccount(voteReceiptAddress);
+    assert(voteReceiptInfo != null);
+    const ix = getClaimTokensInstruction(
+      { owner: owner.publicKey },
+      { candidateName: nonActiveCandidateName },
+    );
+    const result = sendTransaction([ix], [owner]);
+    return result;
+  }
+  it("5.3 Attempt to claim tokens for a non active candidate before a withdraw window given such candidates have NON-ZERO receipts.", async () => {
+    // each candidate has exactly one receipt of users[0].
+    const failed = claimTokensForNonActiveCandidate(
+      newCandidates.winner[1].name,
+      users[0],
+      { hasZeroReceipts: false, while: "before" },
+    );
+    assertTxFailedWithErrorCode(failed, "TokensCannotBeClaimed");
+    const failed2 = claimTokensForNonActiveCandidate(
+      newCandidates.claimableWinner[1].name,
+      users[0],
+      { hasZeroReceipts: false, while: "before" },
+    );
+    assertTxFailedWithErrorCode(failed2, "UnclaimableNow");
+
+    const failed3 = claimTokensForNonActiveCandidate(
+      newCandidates.withdrawn[1].name,
+      users[0],
+      { hasZeroReceipts: false, while: "before" },
+    );
+    assertTxFailedWithErrorCode(failed3, "UnclaimableNow");
+  });
+
+  // newCandidates = {
+  //     claimableWinner:[0(0),1(1),2(1)],
+  //     winner:[0(0),1(1)],
+  //     withdrawn:[1(0),1(1),3(1)]
+  //   }
+  function closeNonActiveCandidate(
+    nonActiveCandidateName: string,
+    state: { hasZeroReceipts: boolean; while: "before" | "during" | "after" },
+  ) {
+    checkNonActiveCandidateWith(nonActiveCandidateName, state);
+
+    const ix = getCloseCandidateInstruction({
+      candidateName: nonActiveCandidateName,
+    });
+    const result = sendTransaction([ix], [admin]);
+    return result;
+  }
+  it("Attempt to close non active candidates before a withdraw window given all candidates have NON-ZERO receipts.", () => {
+    const failed1 = closeNonActiveCandidate(newCandidates.winner[1].name, {
+      hasZeroReceipts: false,
+      while: "before",
+    });
+    assertTxFailedWithErrorCode(failed1, "CloseAllReceiptAccount");
+
+    const failed2 = closeNonActiveCandidate(
+      newCandidates.claimableWinner[1].name,
+      { hasZeroReceipts: false, while: "before" },
+    );
+    assertTxFailedWithErrorCode(failed2, "OpenWithdrawWindowFirst");
+
+    const failed3 = closeNonActiveCandidate(newCandidates.withdrawn[1].name, {
+      hasZeroReceipts: false,
+      while: "before",
+    });
+    assertTxFailedWithErrorCode(failed3, "OpenWithdrawWindowFirst");
+  });
+
+  // newCandidates = {
+  //     claimableWinner:[0(0),1(1),2(1)],
+  //     winner:[0(0),1(1)],
+  //     withdrawn:[1(0),1(1),3(1)]
+  //   }
+
+  function getClearReceiptInstruction(
+    accounts: Record<"voteReceipt", PublicKey>,
+    instructionArgs: { candidateName: string },
+  ) {
+    const { candidateName: _name } = instructionArgs;
+    const data = coder.instruction.encode("clear_receipt", { _name });
+    return new TransactionInstruction({
+      programId,
+      keys: [
+        { pubkey: adminPubkey, isSigner: true, isWritable: false },
+        {
+          pubkey: getPda(SEEDS.hxuiConfig).address,
+          isSigner: false,
+          isWritable: false,
+        },
+        {
+          pubkey: getCandidatePda(_name).address,
+          isSigner: false,
+          isWritable: true,
+        },
+        {
+          pubkey: getPda(SEEDS.hxuiVault).address,
+          isSigner: false,
+          isWritable: true,
+        },
+        {
+          pubkey: accounts.voteReceipt,
+          isSigner: false,
+          isWritable: true,
+        },
+      ],
+      data,
+    });
+  }
+  function clearReceiptForNonActiveCandidate(
+    nonActiveCandidateName: string,
+    state: {
+      while: "during" | "after" | "before";
+      hasZeroReceipts: boolean;
+    },
+  ) {
+    checkNonActiveCandidateWith(nonActiveCandidateName, state);
+
+    /*
+    liteSVM does not have a .getProgramAccountsMethod() which will help us get all the vote recreipts for an candidate by filter them with VoteReceipt::DISCRIMINATOR and the candidate_id. The "crankscript-test" tests this with anchor typescript client using.
+
+    const allVoteReceipts = await program.account.voteReceipt.all([
+      {
+        memcmp: {
+          encoding: "base58",
+          offset: 8,
+          bytes: bs58.encode([candidateState.id]),
+        },
+      },
+    ]);
+      */
+
+    //SIMULATING the above process, as we know the only voter with hxuiMint for any candidate is the users[0], so we will fetch its address and construct a allVoteReceipts.
+
+    const voteReceiptAddress = getVoteReceiptPda(
+      nonActiveCandidateName,
+      users[0].publicKey,
+    ).address;
+    const allVoteReceipts = [voteReceiptAddress]; // done.
+    const ixs: TransactionInstruction[] = [];
+    for (let i = 0; i < allVoteReceipts.length; i++) {
+      const ix = getClearReceiptInstruction(
+        { voteReceipt: allVoteReceipts[0] },
+        { candidateName: nonActiveCandidateName },
+      );
+      ixs.push(ix);
+    }
+    const result = sendTransaction(ixs, [admin]);
+    return result;
+  }
+  it("Attempt to clear receipts for non active candidates before a withdraw window given all candidates have NON-ZERO receipts.", async () => {
+    try {
+      // This should pass as the status of this candidate is winner with 1 receipt, it can be closed before the opening of withdraw window. In fact this candidate cannot open a withdraw window because no tokens will be minted back.
+      const candidateName = newCandidates.winner[1].name;
+
+      const candidateStateBefore = getCandidateAccount(candidateName);
+
+      const voteReceiptAddress = getVoteReceiptPda(
+        candidateName,
+        users[0].publicKey,
+      ).address;
+      // const receiptAccountStateBefore = await program.account.voteReceipt.fetch(
+      //   userReceiptAddress,
+      // );
+
+      const vaultBalanceBefore = svm.getBalance(
+        getPda(SEEDS.hxuiVault).address,
+      );
+      const receiptBalanceBefore = svm.getBalance(voteReceiptAddress);
+
+      const hxuiTokenAccountBefore = getHxuiAccount(users[0].publicKey);
+
+      clearReceiptForNonActiveCandidate(candidateName, {
+        while: "before",
+        hasZeroReceipts: false,
+      });
+
+      const candidateStateAfter = getCandidateAccount(candidateName);
+      const vaultBalanceAfter = svm.getBalance(getPda(SEEDS.hxuiVault).address);
+
+      const hxuiTokenAccountAfter = getHxuiAccount(users[0].publicKey);
+
+      const receiptAccountInfoAfter = svm.getAccount(voteReceiptAddress);
+
+      assert.equal(receiptAccountInfoAfter, null);
+      assert.equal(
+        vaultBalanceAfter - vaultBalanceBefore,
+        receiptBalanceBefore,
+      );
+      assert(
+        candidateStateBefore.total_receipts
+          .sub(candidateStateAfter.total_receipts)
+          .eq(new anchor.BN(1)),
+      );
+      assert.equal(hxuiTokenAccountBefore.amount, hxuiTokenAccountAfter.amount);
+    } catch (err) {
+      assert(false);
+    }
+    const failed = clearReceiptForNonActiveCandidate(
+      newCandidates.claimableWinner[1].name,
+      { while: "before", hasZeroReceipts: false },
+    );
+    assertTxFailedWithErrorCode(failed, "OpenWithdrawWindowFirst.");
+    const failed2 = clearReceiptForNonActiveCandidate(
+      newCandidates.withdrawn[1].name,
+      { while: "before", hasZeroReceipts: false },
+    );
+    assertTxFailedWithErrorCode(failed2, "OpenWithdrawWindowFirst.");
+  });
+
+  // newCandidate.winner[1] HAS 0 RECEIPTS NOW. USE IT WITH CONSIDERTION.
+  // newCandidates = {
+  //     claimableWinner:[0(0),1(1),2(1)],
+  //     winner:[0(0),1(0)],
+  //     withdrawn:[1(0),1(1),3(1)]
+  //   }
+
+  it("Attempt to close Non-active candidates before a withdraw window given all candidates have ZERO receipts.", async () => {
+    const vaultBalanceBefore = svm.getBalance(getPda(SEEDS.hxuiVault).address);
+
+    const candidateBalance = svm.getBalance(newCandidates.winner[1].address);
+    const result = closeNonActiveCandidate(
+      newCandidates.winner[1].name,
+      // Previous test cleared all the receipts in newCandidates.winner[1]
+      { hasZeroReceipts: true, while: "before" },
+    );
+    if (result instanceof FailedTransactionMetadata) {
+      assert(false);
+    }
+    const vaultBalanceAfter = svm.getBalance(getPda(SEEDS.hxuiVault).address);
+
+    // vault as destination while closing an account.
+    assert.equal(vaultBalanceAfter - vaultBalanceBefore, candidateBalance);
+    const winnerCandidate = svm.getAccount(newCandidates.winner[1].address);
+    assert.equal(winnerCandidate, null);
+
+    const result2 = closeNonActiveCandidate(
+      newCandidates.claimableWinner[0].name,
+      { hasZeroReceipts: true, while: "before" },
+    );
+    const result3 = closeNonActiveCandidate(newCandidates.withdrawn[0].name, {
+      hasZeroReceipts: true,
+      while: "before",
+    });
+
+    if (
+      result2 instanceof FailedTransactionMetadata ||
+      result3 instanceof FailedTransactionMetadata
+    ) {
+      assert(false);
+    }
+  });
+  // newCandidates.winner[1], newCandidates.claimableWinner[0], newCandidates.withdrawn[0] IS CLOSED.
+  // newCandidates = {
+  //     claimableWinner:[0(0,closed),1(1),2(1)],
+  //     winner:[0(0),1(0,closed)],
+  //     withdrawn:[1(0,closed),1(1),3(1)]
+  //   }
+
+  function getOpenWithdrawWindowInstruction(instructionArgs: {
+    nonActiveCandidateName: string;
+    until: anchor.BN;
+  }) {
+    const { nonActiveCandidateName: _name, until } = instructionArgs;
+    const data = coder.instruction.encode("open_claimable_window", {
+      _name,
+      until,
+    });
+    return new TransactionInstruction({
+      programId,
+      keys: [
+        { pubkey: adminPubkey, isSigner: true, isWritable: false },
+        {
+          pubkey: getPda(SEEDS.hxuiConfig).address,
+          isSigner: false,
+          isWritable: false,
+        },
+        {
+          pubkey: getCandidatePda(_name).address,
+          isSigner: false,
+          isWritable: true,
+        },
+      ],
+      data,
+    });
+  }
+  function openWithdrawWindowForNonActiveCandidate(
+    nonActiveCandidateName: string,
+    until: anchor.BN,
+  ) {
+    const ix = getOpenWithdrawWindowInstruction({
+      nonActiveCandidateName,
+      until,
+    });
+    const result = sendTransaction([ix], [admin]);
+    return result;
+  }
+  it("Open a withdraw window for non active canidates ", () => {
+    const now = svm.getClock();
+    let until = new anchor.BN(now.unixTimestamp).add(new anchor.BN(14 * 86400));
+    const failed = openWithdrawWindowForNonActiveCandidate(
+      newCandidates.winner[0].name,
+      until,
+    );
+    assertTxFailedWithErrorCode(
+      failed,
+      "CanBeClosedImmediatelyWithoutWithdrawWindow",
+      // For a winner candidate, there is no such thing like opening a withdraw window.
+      // The above error code is due to the receipt having 0 receipts otherwise it would throw "CanBeClosedImmediatelyByClearingReceipts"
+    );
+
+    const metadata = openWithdrawWindowForNonActiveCandidate(
+      newCandidates.withdrawn[1].name,
+      until,
+    );
+
+    if (metadata instanceof FailedTransactionMetadata) {
+      assert(false);
+    }
+
+    const metadata2 = openWithdrawWindowForNonActiveCandidate(
+      newCandidates.claimableWinner[1].name,
+      until,
+    );
+    if (metadata2 instanceof FailedTransactionMetadata) {
+      assert(false);
+    }
+  });
+
+  it("Attempts to clear receipts during a withdraw window for Non active candidates except winner having NON-ZERO receipts", async () => {
+    // Must fail during a withdraw window.
+    const failed = clearReceiptForNonActiveCandidate(
+      newCandidates.claimableWinner[1].name,
+      { while: "during", hasZeroReceipts: false },
+    );
+    assertTxFailedWithErrorCode(failed, "WaitUntilWithdrawWindowIsClosed");
+
+    const failed2 = clearReceiptForNonActiveCandidate(
+      newCandidates.withdrawn[1].name,
+      { while: "during", hasZeroReceipts: false },
+    );
+    assertTxFailedWithErrorCode(failed2, "WaitUntilWithdrawWindowIsClosed");
+  });
+  // same state
+  // newCandidates = {
+  //     claimableWinner:[0(0,closed),1(1),2(1)],
+  //     winner:[0(0),1(0,closed)],
+  //     withdrawn:[1(0,closed),1(1),2(1)]
+  //   }
+  it("Attempt to close Non active candidates during a withdraw window given all candidates has Non zero receipts.", async () => {
+    const failed = closeNonActiveCandidate(
+      newCandidates.claimableWinner[1].name,
+      { hasZeroReceipts: false, while: "during" },
+    );
+    assertTxFailedWithErrorCode(failed, "WaitUntilWithdrawWindowIsClosed");
+
+    const failed2 = closeNonActiveCandidate(newCandidates.withdrawn[1].name, {
+      hasZeroReceipts: false,
+      while: "during",
+    });
+    assertTxFailedWithErrorCode(failed2, "WaitUntilWithdrawWindowIsClosed");
+  });
+  //same state.
+  // newCandidates = {
+  //     claimableWinner:[0(0,closed),1(1),2(1)],
+  //     winner:[0(0),1(0,closed)],
+  //     withdrawn:[1(0,closed),1(1),2(1)]
+  //   }
+  it("Attempt to claim tokens for a non active candidate during a withdraw window given each non active candidate have NON-ZERO receipts.", async () => {
+    const tokenAccountBefore = getHxuiAccount(users[0].publicKey);
+    const [userReceipt, userReceiptInfo] = getVoteReceipt(
+      newCandidates.claimableWinner[1].name,
+      users[0].publicKey,
+    );
+    const candidateStateBefore = getCandidateAccount(
+      newCandidates.claimableWinner[1].name,
+    );
+    const vaultBalanceBefore = svm.getBalance(getPda(SEEDS.hxuiVault).address);
+    claimTokensForNonActiveCandidate(
+      newCandidates.claimableWinner[1].name,
+      users[0],
+      { hasZeroReceipts: false, while: "during" },
+    );
+    const candidateStateAfter = getCandidateAccount(
+      newCandidates.claimableWinner[1].name,
+    );
+
+    assert(
+      candidateStateBefore.total_receipts
+        .sub(candidateStateAfter.total_receipts)
+        .eq(new anchor.BN(1)),
+    );
+    const vaultBalanceAfter = svm.getBalance(getPda(SEEDS.hxuiVault).address);
+    // user got 50% of the tokens spent for claimable winner.
+
+    const tokenAccountAfter = getHxuiAccount(users[0].publicKey);
+    assert(
+      new anchor.BN(tokenAccountAfter.amount - tokenAccountBefore.amount).eq(
+        userReceipt.tokens.div(new anchor.BN(2)),
+      ),
+    );
+    const userReceiptAccountInfoAfter = svm.getAccount(
+      getVoteReceiptPda(
+        newCandidates.claimableWinner[1].name,
+        users[0].publicKey,
+      ).address,
+    );
+    assert.equal(userReceiptAccountInfoAfter, null);
+    assert.equal(
+      vaultBalanceAfter - vaultBalanceBefore,
+      userReceiptInfo.lamports,
+    );
+
+    claimTokensForNonActiveCandidate(
+      newCandidates.withdrawn[1].name,
+      users[0],
+      { hasZeroReceipts: false, while: "during" },
+    );
+
+    const tokenAccountFinally = getHxuiAccount(users[0].publicKey);
+
+    // user got 100% of the tokens spent for withdrawn candidate.
+    assert(
+      new anchor.BN(tokenAccountFinally.amount - tokenAccountAfter.amount).eq(
+        userReceipt.tokens,
+      ),
+    );
+  });
+  // newCandidates.claimableWinner[1] AND newCandidates.withdrawn[1] RECEIPTS ARE CLEARED.
+  // newCandidates = {
+  //     claimableWinner:[0(0,closed),1(0),2(1)],
+  //     winner:[0(0),1(0,closed)],
+  //     withdrawn:[1(0,closed),1(0),2(1)]
+  //   }
+
+  it("Attempt to close a Non active candidate during a withdraw window given each non active candidate has exactly 0 receipts", async () => {
+    const result = closeNonActiveCandidate(
+      newCandidates.claimableWinner[1].name,
+      {
+        hasZeroReceipts: true,
+        while: "during",
+      },
+    );
+    const result2 = closeNonActiveCandidate(newCandidates.withdrawn[1].name, {
+      hasZeroReceipts: true,
+      while: "during",
+    });
+
+    if (
+      result instanceof FailedTransactionMetadata ||
+      result2 instanceof FailedTransactionMetadata
+    ) {
+      assert(false);
+    }
+  });
+  // newCandidates.winner[1] AND newCandidates.withdrawn[1] RECEIPTS ARE CLEARED AND CLOSED.
+  // newCandidates = {
+  //     claimableWinner:[0(0,closed),1(0,closed),2(1)],
+  //     winner:[0(0),1(0,closed)],
+  //     withdrawn:[1(0,closed),1(0,closed),2(1)]
+  //   }
+
+  it("Open and close withdraw window for non withdrawn and claimable winner candidate.", async () => {
+    const now = svm.getClock();
+    const until = now.unixTimestamp + BigInt(14 * 86400);
+    // 14 days
+
+    const result = openWithdrawWindowForNonActiveCandidate(
+      newCandidates.withdrawn[2].name,
+      new anchor.BN(until),
+    );
+    const result2 = openWithdrawWindowForNonActiveCandidate(
+      newCandidates.claimableWinner[2].name,
+      new anchor.BN(until),
+    );
+
+    if (
+      result instanceof FailedTransactionMetadata ||
+      result2 instanceof FailedTransactionMetadata
+    ) {
+      assert(false);
+    }
+    now.unixTimestamp = until + BigInt(1);
+    svm.setClock(now);
+
+    checkNonActiveCandidateWith(newCandidates.withdrawn[2].name, {
+      while: "after",
+    });
+    checkNonActiveCandidateWith(newCandidates.claimableWinner[2].name, {
+      while: "after",
+    });
+  });
+
+  it("Attempt to claim tokens for a non active candidate after the withdraw window where each candidate has NON ZERO receipts.", async () => {
+    const failed = claimTokensForNonActiveCandidate(
+      newCandidates.claimableWinner[2].name,
+      users[0],
+      { hasZeroReceipts: false, while: "after" },
+    );
+    assertTxFailedWithErrorCode(failed, "UnclaimableNow");
+
+    const failed2 = claimTokensForNonActiveCandidate(
+      newCandidates.withdrawn[2].name,
+      users[0],
+      { hasZeroReceipts: false, while: "after" },
+    );
+    assertTxFailedWithErrorCode(failed2, "UnclaimableNow");
+  });
+  // No change.
+  // newCandidates = {
+  //     claimableWinner:[0(0,closed),1(0,closed),2(1)],
+  //     winner:[0(0),1(0,closed)],
+  //     withdrawn:[1(0,closed),1(0,closed),2(1)]
+  //   }
+  it("Attempt to close a Non active candidate after a withdraw window given each non active candidate have NON ZERO receipts.", async () => {
+    // Non zero receipts
+    // CloseAllReceiptAccount
+    const failed = closeNonActiveCandidate(
+      newCandidates.claimableWinner[2].name,
+      { hasZeroReceipts: false, while: "after" },
+    );
+    assertTxFailedWithErrorCode(failed, "CloseAllReceiptAccount");
+
+    const failed2 = closeNonActiveCandidate(
+      newCandidates.claimableWinner[2].name,
+      { hasZeroReceipts: false, while: "after" },
+    );
+    assertTxFailedWithErrorCode(failed2, "CloseAllReceiptAccount");
+  });
+  // No change.
+  // newCandidates = {
+  //     claimableWinner:[0(0,closed),1(0,closed),2(1)],
+  //     winner:[0(0),1(0,closed)],
+  //     withdrawn:[1(0,closed),1(0,closed),2(1)]
+  //   }
+  it("Attempt to clear receipts for a non active candidate after a withdraw window where each non active candidate have non zero receipts", async () => {
+    const result = clearReceiptForNonActiveCandidate(
+      newCandidates.claimableWinner[2].name,
+      { hasZeroReceipts: false, while: "after" },
+    );
+    const result2 = clearReceiptForNonActiveCandidate(
+      newCandidates.withdrawn[2].name,
+      { hasZeroReceipts: false, while: "after" },
+    );
+
+    if (
+      result instanceof FailedTransactionMetadata ||
+      result2 instanceof FailedTransactionMetadata
+    ) {
+      assert(false);
+    }
+  });
+
+  // newCandidates.claimableWinner[2] and newCandidates.withdrawn[2] RECEIPTS ARE CLEARED.
+  // newCandidates = {
+  //     claimableWinner:[0(0,closed),1(0,closed),2(0)],
+  //     winner:[0(0),1(0,closed)],
+  //     withdrawn:[1(0,closed),1(0,closed),2(0)]
+  //   }
+
+  it("Attempt to close Non-active candidates after a withdraw window given all candidates have ZERO receipts.", async () => {
+    const result = closeNonActiveCandidate(
+      newCandidates.claimableWinner[2].name,
+      { hasZeroReceipts: true, while: "after" },
+    );
+    const result2 = closeNonActiveCandidate(newCandidates.withdrawn[2].name, {
+      hasZeroReceipts: true,
+      while: "after",
+    });
+    if (
+      result instanceof FailedTransactionMetadata ||
+      result2 instanceof FailedTransactionMetadata
+    ) {
+      assert(false);
+    }
+  });
+
+  // newCandidates.claimableWinner[2] and newCandidates.withdrawn[2] RECEIPTS ARE CLOSED.
+  // newCandidates = {
+  //     claimableWinner:[0(0,closed),1(0,closed),2(0,closed)],
+  //     winner:[0(0),1(0,closed)],
+  //     withdrawn:[1(0,closed),1(0,closed),2(0,closed)]
+  //   }
+});
+
 describe("6)Withdrawl and financing the vote receipts.", () => {
-  /* minimum balance for hxuiVault-> enough lamports to exempt its own rent + enough lamports to exempt vote receipt accounts
-   created upon new voters per candidate by assuming every vote requires a vote receipt. The economics is managed by ensuring
-    the lamports spent to buy tokens to vote will always be greater than the rent of the VoteReceipt account. So user buys voting
-     tokens -> sends the lamports to the vault -> vaul pays the rent upon vote. Hastle free, Better UX. The money is made when the
+  /*Vault pays the rent for all the new vote receipts created. So, the minimum balance for hxuiVault = enough lamports to exempt its own rent + enough lamports to exempt every new vote receipt account possibly created Math.floor(hxuiMint.supply/tokensPerVote). This assumes that every new vote requires a new receipt and the price paid by user per vote in lamports is > than the rent of each vote receipt.
+     So user buys voting
+     tokens -> sends the lamports to the vault -> vault pays the rent upon vote. Need not pay rent for creating a vote receipt, Better UX. The money is made when the
       receipt is closed in various scenarios. I think I should have a "rob_the_vault" instruction that just empties the vault...Because if
-       there exists a non active user who is never gonna vote but holding 4 tokens, then the lamports equivalent to the rent of 2 vote
-        receipt accounts will be stucked in the vault forever.Or should I keep the admin as permanent delegate of hxuiMint token and
-    use interest bearing extension to track the last mint time (is it possible). I can run a 'crank' script that burns tokens
-    in token accounts for non active users after a threshold time and let me withdraw more lamports from the vault.
+       there exists a non active user who is never gonna vote but hols 4 voting tokens, then the lamports equivalent to the rent of 2 vote
+        receipt accounts will be stuck in the vault forever or should I keep the admin as permanent delegate of hxuiMint token and
+    use interest bearing extension to track the last mint time (if its possible). I can run a 'crank' script that burns tokens
+    in token accounts for non active users after a threshold time and let me withdraw more lamports from the vault.Sounds stupid. requires brain storming. Interest bearing token is a pure cosmetic extension i think.
     */
 
   function getMinimumVaultBalance() {
@@ -1523,7 +2256,6 @@ function getSafeWithdrawlFromVaultInstruction(
   return new TransactionInstruction({
     programId,
     keys: [
-      //admin, config, vault,mint system, token
       {
         pubkey: adminPubkey,
         isSigner: true,
@@ -1544,7 +2276,7 @@ function getSafeWithdrawlFromVaultInstruction(
         isSigner: false,
         isWritable: false,
       },
-      { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       { pubkey: TOKEN_2022_PROGRAM_ID, isSigner: false, isWritable: false },
     ],
     data,
@@ -1576,7 +2308,7 @@ function getCreatePollInstruction(instructionArgs: {
         isSigner: false,
         isWritable: true,
       },
-      { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     data,
   });
@@ -1695,7 +2427,7 @@ function getVoteCandidateInstruction(
         isSigner: false,
         isWritable: false,
       },
-      { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       {
         pubkey: ASSOCIATED_TOKEN_PROGRAM_ID,
         isSigner: false,
@@ -1727,7 +2459,7 @@ function getRegisterForFreeTokensInstruction(accounts: { for: PublicKey }) {
         isSigner: false,
         isWritable: true,
       },
-      { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     data,
   });
@@ -1863,13 +2595,38 @@ function getBuyPaidTokensInstruction(
         isSigner: false,
         isWritable: false,
       },
-      { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       { pubkey: TOKEN_2022_PROGRAM_ID, isSigner: false, isWritable: false },
     ],
     data,
   });
 }
 
+function getClaimbackOfferInstruction(instructionArgs: {
+  candidateName: string;
+}) {
+  const { candidateName: _name } = instructionArgs;
+  const data = coder.instruction.encode("set_claim_back_offer", {
+    _name,
+  });
+  return new TransactionInstruction({
+    programId,
+    keys: [
+      { pubkey: adminPubkey, isSigner: true, isWritable: false },
+      {
+        pubkey: getPda(SEEDS.hxuiConfig).address,
+        isSigner: false,
+        isWritable: false,
+      },
+      {
+        pubkey: getCandidatePda(_name).address,
+        isSigner: false,
+        isWritable: true,
+      },
+    ],
+    data,
+  });
+}
 function getCreateCandidateInstruction(
   accounts: { admin: PublicKey },
   instructionArgs: {
@@ -1897,7 +2654,7 @@ function getCreateCandidateInstruction(
         isWritable: true,
       },
 
-      { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       { pubkey: TOKEN_2022_PROGRAM_ID, isSigner: false, isWritable: false },
     ],
     data,
@@ -2028,7 +2785,7 @@ function getVoteCandidateWithHxuiLiteInstruction(
         isWritable: false,
       },
 
-      { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       {
         pubkey: ASSOCIATED_TOKEN_PROGRAM_ID,
         isSigner: false,
@@ -2038,4 +2795,12 @@ function getVoteCandidateWithHxuiLiteInstruction(
     ],
     data,
   });
+}
+
+function getVoteReceiptPda(candidateName: string, owner: PublicKey) {
+  const [address, bump] = PublicKey.findProgramAddressSync(
+    [Buffer.from("vote_receipt"), Buffer.from(candidateName), owner.toBuffer()],
+    programId,
+  );
+  return { address, bump };
 }

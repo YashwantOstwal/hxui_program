@@ -19,6 +19,9 @@ pub struct RegisterFreeTokens<'info>{
 }
 
 pub fn initialise_hxui_lite_minted_timestamp(ctx:Context<RegisterFreeTokens>)->Result<()>{
-    ctx.accounts.hxui_lite_minted_timestamp.bump = ctx.bumps.hxui_lite_minted_timestamp;
+    let hxui_lite_minted_timestamp = &mut ctx.accounts.hxui_lite_minted_timestamp;
+    let now = Clock::get()?.unix_timestamp;
+    hxui_lite_minted_timestamp.next_mintable_timestamp = now;
+    hxui_lite_minted_timestamp.bump = ctx.bumps.hxui_lite_minted_timestamp;
     Ok(())
 }

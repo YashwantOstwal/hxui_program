@@ -10,7 +10,7 @@ pub use states::*;
 pub use constants::*;
 pub use errors::*;
 
-declare_id!("EpF1FNjziFb8wrR1p5usVW1AbcU7saCt8deoiVY31zE7");
+declare_id!("GpTybHnUiPQdYE3WnnzDKKpwZ2kWkt651yP9cTfNoyTN");
 #[program]
 pub mod hxui {
 
@@ -27,8 +27,6 @@ pub mod hxui {
                 tokens_per_vote,
                 bump:config_bump
             },
-            // hxui_metadata,
-            // hxui_lite_metadata
         )
 
         
@@ -74,9 +72,6 @@ pub fn draw_winner<'info>(ctx:Context<'_, '_, 'info, 'info,PickWinner<'_>>)->Res
         instructions::open_claimable_window::set_closable_time(ctx,until)
     }
    
-    // pub fn fund_admin_for_candidate(ctx:Context<FundAdminForCandidate>)->Result<()>{
-    //     instructions::fund_admin_for_candidate::transfer_rent_to_admin(ctx)
-    // }
 
      pub fn buy_paid_tokens(ctx:Context<BuyPaidTokens>,amount:u64)->Result<()>{
         instructions::buy_paid_tokens::payment(&ctx,&amount)?;
@@ -106,6 +101,9 @@ pub fn draw_winner<'info>(ctx:Context<'_, '_, 'info, 'info,PickWinner<'_>>)->Res
         instructions::clear_receipt::close_receipt_account(ctx)
     }
 
+    pub fn set_claim_back_offer(ctx:Context<SetClaimBackOffer>,_name:String)->Result<()>{
+        instructions::set_claim_back_offer::set_claimable_if_winner(ctx)
+    }
    pub fn create_new_account(ctx:Context<CreateNewAccount>)->Result<()>{
         instructions::create_new_account::create(ctx)
     }
@@ -113,5 +111,6 @@ pub fn draw_winner<'info>(ctx:Context<'_, '_, 'info, 'info,PickWinner<'_>>)->Res
   pub fn temp(ctx:Context<Temp>)->Result<()>{
         instructions::create_new_account::reset(ctx)
     }
+
 
 }
