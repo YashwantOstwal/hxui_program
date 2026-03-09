@@ -1,6 +1,6 @@
-use anchor_lang::{prelude::*, system_program::{Transfer,transfer}};
+use anchor_lang::{prelude::*, system_program::{Transfer, CreateAccount, create_account, transfer}};
 use anchor_spl::{
-    token_interface::{ Mint,Token2022,token_metadata_initialize,TokenMetadataInitialize},
+    token_2022::spl_token_2022::{extension::ExtensionType, pod::PodMint}, token_interface::{ InitializeMint2, MetadataPointerInitialize, Mint, NonTransferableMintInitialize, Token2022, TokenMetadataInitialize, initialize_mint2, metadata_pointer_initialize, non_transferable_mint_initialize, token_metadata_initialize}
 };
 use spl_token_metadata_interface::state::TokenMetadata;
 use spl_type_length_value::variable_len_pack::VariableLenPack;
@@ -12,7 +12,7 @@ pub struct InitialiseDapp<'info>{
     #[account(mut)]
     pub admin:Signer<'info>,
 
-    pub lite_authority :SystemAccount<'info>,
+    pub lite_authority :Signer<'info>,
 
     #[account(
         mut,
@@ -42,17 +42,13 @@ pub struct InitialiseDapp<'info>{
         space = ANCHOR_DISCRIMINATOR + Config::INIT_SPACE
     )]
     pub hxui_config: Account<'info,Config>,
-
+    
     #[account(
-        init,
-        payer = admin,
+        mut,
         seeds = [b"hxui_lite_mint"],
         bump,
-        mint::decimals = 0,
-        mint::authority = lite_authority,
-        mint::token_program = token_program,
     )]
-    pub hxui_lite_mint:InterfaceAccount<'info,Mint>,
+    pub hxui_lite_mint:SystemAccount<'info>,
 
     #[account(
         init,
@@ -98,9 +94,9 @@ pub fn initialise_config(ctx:Context<InitialiseDapp>,config:Config)->Result<()>{
         symbol:hxui_metadata.symbol.clone(),
         ..Default::default()
     };
-    let packed_metadata = hxui_metadata_state.get_packed_len();
+    let hxui_packed_metadata = hxui_metadata_state.get_packed_len();
     
-    if let Ok(metadata_len) = packed_metadata {
+    if let Ok(metadata_len) = hxui_packed_metadata {
     let cpi_context = CpiContext::new(ctx.accounts.system_program.to_account_info(),Transfer{
         from:ctx.accounts.admin.to_account_info(),
         to:ctx.accounts.hxui_mint.to_account_info()
@@ -119,6 +115,59 @@ pub fn initialise_config(ctx:Context<InitialiseDapp>,config:Config)->Result<()>{
         }).with_signer(&signer_seeds);
         token_metadata_initialize(hxui_metadata_context, hxui_metadata.name, hxui_metadata.symbol, hxui_metadata.uri)?;
     }
+
+    // hxui lite mint 
+    let mint_len = ExtensionType::try_calculate_account_len::<PodMint>(&[ExtensionType::NonTransferable,ExtensionType::MetadataPointer])?;
+    
+    let hxui_lite_metadata_state = TokenMetadata{
+        name:"100xUI Lite".to_string(),
+        symbol:"HXUILITE".to_string(),uri:"https://raw.githubusercontent.com/solana-developers/opos-asset/main/assets/DeveloperPortal/metadata.json".to_string(),
+        ..Default::default()
+    };
+
+    let hxui_lite_packed_metadata = hxui_lite_metadata_state.get_packed_len();
+    if let Ok(metadata_len) = hxui_lite_packed_metadata {
+        let rent = rent.minimum_balance(mint_len) + rent.minimum_balance(metadata_len);
+
+        let seeds:&[&[u8]] = &[b"hxui_lite_mint",&[ctx.bumps.hxui_lite_mint]];
+        let signer_seeds = [&seeds[..]];
+        let create_account_ctx = CpiContext::new(ctx.accounts.token_program.to_account_info(),CreateAccount{
+            from:ctx.accounts.admin.to_account_info(),
+            to:ctx.accounts.hxui_lite_mint.to_account_info()
+        }).with_signer(&signer_seeds);
+        create_account(create_account_ctx, rent, mint_len as u64, ctx.accounts.token_program.key)?;
+
+        let non_transferable_mint_initialize_ctx = CpiContext::new(ctx.accounts.token_program.to_account_info(),NonTransferableMintInitialize{
+            token_program_id:ctx.accounts.token_program.to_account_info(),
+            mint:ctx.accounts.hxui_lite_mint.to_account_info(),
+        });
+
+        non_transferable_mint_initialize(non_transferable_mint_initialize_ctx)?;
+
+        let metadata_pointer_initialize_ctx = CpiContext::new(ctx.accounts.token_program.to_account_info(),MetadataPointerInitialize{
+            token_program_id:ctx.accounts.token_program.to_account_info(),
+            mint:ctx.accounts.hxui_lite_mint.to_account_info(),
+        });
+
+        metadata_pointer_initialize(metadata_pointer_initialize_ctx,Some(ctx.accounts.lite_authority.key()),Some(ctx.accounts.hxui_lite_mint.key()))?;
+
+        let initialise_mint = CpiContext::new(ctx.accounts.token_program.to_account_info(),InitializeMint2{
+            mint:ctx.accounts.hxui_lite_mint.to_account_info(),
+        });
+
+        initialize_mint2(initialise_mint,0,&ctx.accounts.lite_authority.key(),None)?;
+
+        let token_metadata_initialize_ctx = CpiContext::new(ctx.accounts.token_program.to_account_info(),TokenMetadataInitialize{
+            program_id:ctx.accounts.token_program.to_account_info(),
+            mint: ctx.accounts.hxui_lite_mint.to_account_info(),
+            metadata: ctx.accounts.hxui_lite_mint.to_account_info(),
+            update_authority: ctx.accounts.lite_authority.to_account_info(),
+            mint_authority: ctx.accounts.lite_authority.to_account_info(),
+        }); 
+        token_metadata_initialize(token_metadata_initialize_ctx,hxui_lite_metadata_state.name,hxui_lite_metadata_state.symbol,hxui_lite_metadata_state.uri)?;
+
+    }
+
     Ok(())
 
 }

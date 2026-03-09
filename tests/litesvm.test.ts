@@ -115,14 +115,12 @@ describe("1) initialise_dapp instruction testing", () => {
     const data = coder.instruction.encode("initialise_dapp", {
       price_per_token,
       tokens_per_vote,
-      // hxui_metadata,
-      // hxui_lite_metadata: hxui_metadata,
     });
     const ix = new TransactionInstruction({
       programId,
       keys: [
         { pubkey: adminPubkey, isSigner: true, isWritable: true },
-        { pubkey: liteAuthority.publicKey, isSigner: false, isWritable: false },
+        { pubkey: liteAuthority.publicKey, isSigner: true, isWritable: false },
         {
           pubkey: getPda(SEEDS.hxuiVault).address,
           isSigner: false,
@@ -155,7 +153,13 @@ describe("1) initialise_dapp instruction testing", () => {
       data,
     });
 
-    sendTransaction([ix], [admin]);
+    const failed = sendTransaction([ix], [admin, liteAuthority], {
+      logIfFailed: true,
+    });
+
+    if (failed instanceof FailedTransactionMetadata) {
+      console.log("failed");
+    }
 
     const hxuiConfigAccount = svm.getAccount(getPda(SEEDS.hxuiConfig).address);
     const hxuiConfigData = coder.accounts.decode(
@@ -186,7 +190,7 @@ describe("1) initialise_dapp instruction testing", () => {
       programId,
       keys: [
         { pubkey: adminPubkey, isSigner: true, isWritable: true },
-        { pubkey: liteAuthority.publicKey, isSigner: false, isWritable: false },
+        { pubkey: liteAuthority.publicKey, isSigner: true, isWritable: false },
         {
           pubkey: getPda(SEEDS.hxuiVault).address,
           isSigner: false,
@@ -218,7 +222,7 @@ describe("1) initialise_dapp instruction testing", () => {
       ],
       data,
     });
-    const failed = sendTransaction([ix], [admin]);
+    const failed = sendTransaction([ix], [admin, liteAuthority]);
     if (failed instanceof FailedTransactionMetadata) {
       assert(true, "a");
     } else {
