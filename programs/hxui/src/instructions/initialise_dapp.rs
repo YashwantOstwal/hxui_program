@@ -86,7 +86,7 @@ pub fn initialise_config(ctx:Context<InitialiseDapp>,config:Config)->Result<()>{
     let rent = Rent::get()?;
     transfer(cpi_context, rent.minimum_balance(0))?;
 
-    let hxui_metadata   = TokenMetadataArgs{name:"100xui".to_string(),symbol:"HXUI".to_string(),uri:"https://raw.githubusercontent.com/solana-developers/opos-asset/main/assets/DeveloperPortal/metadata.json".to_string()};
+    let hxui_metadata   = TokenMetadataArgs{name:"100xui".to_string(),symbol:"HXUI".to_string(),uri:"https://100xui.com/metadata/hxui/metadata.json".to_string()};
 
     let hxui_metadata_state = TokenMetadata{
         name:hxui_metadata.name.clone(),
@@ -121,7 +121,7 @@ pub fn initialise_config(ctx:Context<InitialiseDapp>,config:Config)->Result<()>{
     
     let hxui_lite_metadata_state = TokenMetadata{
         name:"100xUI Lite".to_string(),
-        symbol:"HXUILITE".to_string(),uri:"https://raw.githubusercontent.com/solana-developers/opos-asset/main/assets/DeveloperPortal/metadata.json".to_string(),
+        symbol:"HXUILITE".to_string(),uri:"https://100xui.com/metadata/hxui-lite/metadata.json".to_string(),
         ..Default::default()
     };
 
