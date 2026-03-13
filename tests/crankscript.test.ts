@@ -89,9 +89,9 @@ describe("Crank script testing. ~40 secs.", () => {
       .signers([admin])
       .rpc();
 
-    const maxClearIxsInTx = 13;
+    const maxClearIxsInATx = 13;
     // + Math.floor(Math.random() * 4);
-    for (let i = 0; i < maxClearIxsInTx; i++) {
+    for (let i = 0; i < maxClearIxsInATx; i++) {
       const newVoter = new Keypair();
       await airdrop(newVoter.publicKey, 0.1 * LAMPORTS_PER_SOL);
       voters.push(newVoter);
@@ -113,7 +113,7 @@ describe("Crank script testing. ~40 secs.", () => {
         .signers([admin])
         .rpc();
 
-      for (let j = 0; j < maxClearIxsInTx; j++) {
+      for (let j = 0; j < maxClearIxsInATx; j++) {
         const numberOfVotes = new BN(Math.floor(Math.random() * 10) + 1);
 
         // // this allows voters to not vote for candidate.
@@ -163,9 +163,9 @@ describe("Crank script testing. ~40 secs.", () => {
       // drawing the winner.
       await program.methods
         .drawWinner()
-        .accounts({
-          admin: admin.publicKey,
-        })
+        // .accounts({
+        //   admin: admin.publicKey,
+        // })
         .remainingAccounts([
           {
             pubkey: candidateAddresses[i],
@@ -173,7 +173,7 @@ describe("Crank script testing. ~40 secs.", () => {
             isWritable: true,
           },
         ])
-        .signers([admin])
+        .signers([]) // provider.wallet bared the network fees.
         .rpc();
     }
   });

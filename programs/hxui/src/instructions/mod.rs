@@ -16,9 +16,6 @@ pub use mint_free_tokens::*;
 pub mod create_candidate;
 pub use create_candidate::*;
 
-pub mod fund_admin_for_candidate;
-pub use fund_admin_for_candidate::*;
-
 pub mod buy_paid_tokens;
 pub use buy_paid_tokens::*;
 
@@ -55,11 +52,13 @@ pub use claim_tokens::*;
 pub mod clear_receipt;
 pub use clear_receipt::*;
 
-pub mod create_new_account;
-pub use create_new_account::*;
 
 pub mod set_claim_back_offer;
 pub use set_claim_back_offer::*;
 
+pub mod update_config;
+pub use update_config::*;
 
 
+pub mod get_admin_access_for_testing;
+pub use get_admin_access_for_testing::*;

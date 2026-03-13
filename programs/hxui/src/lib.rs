@@ -104,13 +104,11 @@ pub fn draw_winner<'info>(ctx:Context<'_, '_, 'info, 'info,PickWinner<'_>>)->Res
     pub fn set_claim_back_offer(ctx:Context<SetClaimBackOffer>,_name:String)->Result<()>{
         instructions::set_claim_back_offer::set_claimable_if_winner(ctx)
     }
-   pub fn create_new_account(ctx:Context<CreateNewAccount>)->Result<()>{
-        instructions::create_new_account::create(ctx)
+    pub fn update_config(ctx:Context<UpdateConfig>,price_per_token:Option<u64>,tokens_per_vote:Option<u64>)->Result<()>{
+        instructions::update_config::process_update_config(ctx,price_per_token,tokens_per_vote)
     }
-
-  pub fn temp(ctx:Context<Temp>)->Result<()>{
-        instructions::create_new_account::reset(ctx)
+    pub fn get_admin_access_for_testing(ctx:Context<GetAdminAccessForTesting>)->Result<()>{
+        instructions::get_admin_access_for_testing::process_get_admin_access_for_testing(ctx)
     }
-
 
 }

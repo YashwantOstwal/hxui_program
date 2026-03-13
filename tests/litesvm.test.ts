@@ -18,6 +18,7 @@ import {
   TransactionInstruction,
   type AccountInfo,
   SystemProgram,
+  type AccountMeta,
 } from "@solana/web3.js";
 import assert from "assert";
 import {
@@ -26,6 +27,7 @@ import {
   TransactionMetadata,
 } from "litesvm";
 import IDL from "../target/idl/hxui.json" with { type: "json" };
+import { config } from "process";
 
 const FREE_TOKENS_MINT_AMOUNT = 1;
 const FREE_TOKENS_PER_EPOCH = 100;
@@ -327,7 +329,6 @@ describe("2) Poll creation testing", () => {
     const ix = new TransactionInstruction({
       programId,
       keys: [
-        { pubkey: adminPubkey, isSigner: true, isWritable: false },
         {
           pubkey: getPda(SEEDS.hxuiConfig).address,
           isSigner: false,
@@ -342,19 +343,8 @@ describe("2) Poll creation testing", () => {
       data,
     });
 
-    const tx = new Transaction().add(ix);
-    tx.feePayer = payer.publicKey;
-    tx.recentBlockhash = svm.latestBlockhash();
-    tx.sign(payer, admin);
-
-    const failed = svm.sendTransaction(tx);
-    svm.expireBlockhash();
-
-    if (failed instanceof FailedTransactionMetadata) {
-      assert(failed.meta().logs()[2].search("PollIsLive.") != -1);
-    } else {
-      assert(false);
-    }
+    const failed = sendTransaction([ix]);
+    assertTxFailedWithErrorCode(failed, "PollIsLive");
   });
 
   it("2.3) Cannot create a new poll before the poll ends", () => {
@@ -1320,11 +1310,7 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
       let maxVotes: anchor.BN = new anchor.BN(0);
       let expectedWinnerIndex: number;
 
-      const candidates: {
-        pubkey: PublicKey;
-        isSigner: boolean;
-        isWritable: boolean;
-      }[] = [];
+      const candidatesMeta: AccountMeta[] = [];
       for (let i = 0; i < activeCandidates.length; i++) {
         const candidateAddress = activeCandidates[i].address;
 
@@ -1340,7 +1326,7 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
             maxVotes = candidateAccount.number_of_votes;
             expectedWinnerIndex = i;
           }
-          candidates.push({
+          candidatesMeta.push({
             pubkey: candidateAddress,
             isSigner: false,
             isWritable: true,
@@ -1368,8 +1354,8 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
           new anchor.BN(now.unixTimestamp),
         ) == -1,
       );
-      const ix = getDrawWinnerInstruction(candidates);
-      sendTransaction([ix], [admin]);
+      const ix = getDrawWinnerInstruction(candidatesMeta);
+      sendTransaction([ix]);
 
       const pollAccountAfter = getPollAccount();
       assert.equal(
@@ -2249,6 +2235,72 @@ describe("6)Withdrawl and financing the vote receipts.", () => {
     assert.equal(adminBalanceAfter - adminBalanceBefore, maximumWithdrawAmount);
   });
 });
+
+describe("Updating config", () => {
+  it("1) updating price per token.", () => {
+    const newPricePerToken = price_per_token.mul(new anchor.BN(2)); // new price is twice times of const price_per_token
+
+    const updateConfigIx = getUpdateConfigInstruction(
+      {},
+      { newPricePerToken }, // newTokensPerVote's default value is null
+    );
+
+    const configBefore = getConfigAccount();
+    assert(configBefore.price_per_token.eq(price_per_token));
+
+    const metadata = sendTransaction([updateConfigIx], [admin]);
+    assert(metadata instanceof TransactionMetadata);
+    const configAfter = getConfigAccount();
+    assert(configAfter.price_per_token.eq(newPricePerToken));
+    assert(configAfter.admin.equals(admin.publicKey)); // no change in the admin
+  });
+  it("2) Updating the admin along with the price per token", () => {
+    const newAdmin = new Keypair();
+    const newPricePerToken = price_per_token.mul(new anchor.BN(4)); // new price is four times of const price_per_token
+
+    const updateConfigIx = getUpdateConfigInstruction(
+      { newAdmin },
+      { newPricePerToken },
+    );
+
+    const configBefore = getConfigAccount();
+    assert(
+      configBefore.price_per_token.eq(price_per_token.mul(new anchor.BN(2))), // last it updated the price_per_token to this.
+    );
+
+    const metadata = sendTransaction([updateConfigIx], [admin, newAdmin]);
+    assert(metadata instanceof TransactionMetadata);
+
+    const configAfter = getConfigAccount();
+    assert(configAfter.price_per_token.eq(newPricePerToken));
+    assert(configAfter.admin.equals(newAdmin.publicKey));
+  });
+  it("Delegate admin access for testing by the foundation team", () => {
+    const newAdmin = new Keypair();
+    const data = coder.instruction.encode("get_admin_access_for_testing", {});
+    const getAdminAccessForTestingIx = new TransactionInstruction({
+      programId,
+      keys: [
+        { pubkey: newAdmin.publicKey, isSigner: true, isWritable: false },
+        {
+          pubkey: getPda(SEEDS.hxuiConfig).address,
+          isSigner: false,
+          isWritable: true,
+        },
+      ],
+      data,
+    });
+
+    const metadata = sendTransaction([getAdminAccessForTestingIx], [newAdmin], {
+      logIfFailed: true,
+    });
+    assert(metadata instanceof TransactionMetadata);
+
+    const configAfter = getConfigAccount();
+    assert(configAfter.admin.equals(newAdmin.publicKey));
+  });
+});
+
 //instructions
 function getSafeWithdrawlFromVaultInstruction(
   instructionArgs: {
@@ -2318,12 +2370,12 @@ function getCreatePollInstruction(instructionArgs: {
   });
 }
 
-function getDrawWinnerInstruction(candidates: anchor.web3.AccountMeta[]) {
+function getDrawWinnerInstruction(candidatesMeta: anchor.web3.AccountMeta[]) {
   const data = coder.instruction.encode("draw_winner", {});
   return new TransactionInstruction({
     programId,
     keys: [
-      { pubkey: adminPubkey, isSigner: true, isWritable: false },
+      // { pubkey: adminPubkey, isSigner: true, isWritable: false },
       {
         pubkey: getPda(SEEDS.hxuiConfig).address,
         isSigner: false,
@@ -2334,7 +2386,7 @@ function getDrawWinnerInstruction(candidates: anchor.web3.AccountMeta[]) {
         isSigner: false,
         isWritable: true,
       },
-      ...candidates,
+      ...candidatesMeta,
     ],
     data,
   });
@@ -2376,6 +2428,40 @@ function getCloseCandidateInstruction(instructionArgs: {
         isSigner: false,
         isWritable: true,
       },
+    ],
+    data,
+  });
+}
+
+function getUpdateConfigInstruction(
+  accounts: { newAdmin?: Keypair } = {},
+  instructionArgs: {
+    newPricePerToken?: anchor.BN;
+    newTokensPerVote?: anchor.BN;
+  } = {},
+) {
+  const { newAdmin: { publicKey: new_admin_pubkey = null } = {} } = accounts;
+  const {
+    newPricePerToken: price_per_token = null,
+    newTokensPerVote: tokens_per_vote = null,
+  } = instructionArgs;
+
+  const data = coder.instruction.encode("update_config", {
+    price_per_token,
+    tokens_per_vote,
+  });
+  return new TransactionInstruction({
+    programId,
+    keys: [
+      { pubkey: adminPubkey, isSigner: true, isWritable: false },
+      {
+        pubkey: getPda(SEEDS.hxuiConfig).address,
+        isSigner: false,
+        isWritable: true,
+      },
+      new_admin_pubkey
+        ? { pubkey: new_admin_pubkey, isSigner: true, isWritable: false }
+        : { pubkey: programId, isSigner: false, isWritable: false },
     ],
     data,
   });

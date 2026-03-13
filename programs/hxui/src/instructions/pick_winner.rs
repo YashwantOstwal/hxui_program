@@ -3,10 +3,8 @@ use anchor_lang::prelude::*;
 use crate::{Candidate, CandidateStatus, Config, CustomError, Poll};
 #[derive(Accounts)]
 pub struct PickWinner<'info>{
-    pub admin:Signer<'info>,
 
     #[account(
-        has_one = admin,
         seeds = [b"hxui_config"],
         bump = hxui_config.bump
     )]
@@ -32,7 +30,7 @@ pub fn pick_winner<'info>(ctx:Context<'_, '_, 'info, 'info,PickWinner<'_>>)->Res
     let mut candidates= Vec::new();
     
     
-    require!(!missing_candidates.is_empty(),CustomError::NoCandidates);
+    require!(!missing_candidates.is_empty(),CustomError::NoCandidates); // no active candidates to pick a winner from
     require!(!ctx.remaining_accounts.is_empty(),CustomError::PassAllActiveCandidates);
     for account_info in ctx.remaining_accounts{
         let candidate:Account<Candidate> = Account::try_from(account_info)?;
@@ -48,7 +46,6 @@ pub fn pick_winner<'info>(ctx:Context<'_, '_, 'info, 'info,PickWinner<'_>>)->Res
     }
 }
     require!(missing_candidates.is_empty(),CustomError::PassAllActiveCandidates);
-    // require!(candidates.len() == total_candidates,CustomError::);
     let mut winner_index = 0;
 
     for i in 1..candidates.len(){
@@ -60,6 +57,7 @@ pub fn pick_winner<'info>(ctx:Context<'_, '_, 'info, 'info,PickWinner<'_>>)->Res
         }
     }
 
+    // require!(candidates[winner_index].number_of_votes >= 10,CustomError::NotEnoughVotesForWinner); 
     if candidates[winner_index].claimable_if_winner {
         candidates[winner_index].candidate_status = CandidateStatus::ClaimableWinner
     }else {

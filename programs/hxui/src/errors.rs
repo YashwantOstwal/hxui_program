@@ -112,6 +112,9 @@ pub enum CustomError {
     ActiveCandidateCannotOpenWithdrawWindow,
 
     #[msg("Cannot set claimable for non active candidate.")]
-    CannotSetClaimableForNonActiveCandidate
+    CannotSetClaimableForNonActiveCandidate,
+
+    #[msg("Candidate must have atleast 10 votes to be a winner.")]
+    NotEnoughVotesForWinner
 
 }

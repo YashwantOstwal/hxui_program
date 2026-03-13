@@ -10,15 +10,9 @@ pub use free_token_timestamp::*;
 pub mod candidate;
 pub use candidate::*;
 
-pub mod candidate_voters;
-pub use candidate_voters::*;
-
-
 pub mod free_tokens_counter;
 pub use free_tokens_counter::*;
 
 pub mod vote_receipt;
 pub use vote_receipt::*;
 
-pub mod schema;
-pub use schema::*;
