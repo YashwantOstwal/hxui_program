@@ -114,10 +114,8 @@ describe("Crank script testing. ~40 secs.", () => {
         .rpc();
 
       for (let j = 0; j < maxClearIxsInATx; j++) {
-        const numberOfVotes = new BN(Math.floor(Math.random() * 10) + 1);
+        const numberOfVotes = new BN(Math.floor(Math.random() * 10) + 10);
 
-        // // this allows voters to not vote for candidate.
-        // if (numberOfVotes.isZero() === false) {
         // Buying enough tokens to vote.
         const numberOfTokens = numberOfVotes.mul(tokensPerVote);
         await program.methods
@@ -163,9 +161,6 @@ describe("Crank script testing. ~40 secs.", () => {
       // drawing the winner.
       await program.methods
         .drawWinner()
-        // .accounts({
-        //   admin: admin.publicKey,
-        // })
         .remainingAccounts([
           {
             pubkey: candidateAddresses[i],

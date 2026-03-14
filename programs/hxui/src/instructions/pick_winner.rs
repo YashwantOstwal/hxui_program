@@ -57,7 +57,7 @@ pub fn pick_winner<'info>(ctx:Context<'_, '_, 'info, 'info,PickWinner<'_>>)->Res
         }
     }
 
-    // require!(candidates[winner_index].number_of_votes >= 10,CustomError::NotEnoughVotesForWinner); 
+    require!(candidates[winner_index].number_of_votes >= 10,CustomError::NotEnoughVotesForWinner); 
     if candidates[winner_index].claimable_if_winner {
         candidates[winner_index].candidate_status = CandidateStatus::ClaimableWinner
     }else {

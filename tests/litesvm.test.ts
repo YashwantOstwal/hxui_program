@@ -1,14 +1,11 @@
 import anchor from "@coral-xyz/anchor";
 import {
-  getMint,
   TOKEN_2022_PROGRAM_ID,
   getAssociatedTokenAddressSync,
   createAssociatedTokenAccountInstruction,
-  getAccount,
   unpackMint,
   unpackAccount,
   ASSOCIATED_TOKEN_PROGRAM_ID,
-  AccountState,
 } from "@solana/spl-token";
 import {
   PublicKey,
@@ -27,10 +24,10 @@ import {
   TransactionMetadata,
 } from "litesvm";
 import IDL from "../target/idl/hxui.json" with { type: "json" };
-import { config } from "process";
 
 const FREE_TOKENS_MINT_AMOUNT = 1;
 const FREE_TOKENS_PER_EPOCH = 100;
+const COOLDOWN = 43200;
 const svm = new LiteSVM();
 const programId = new PublicKey(IDL.address);
 const payer = new Keypair();
@@ -708,6 +705,7 @@ describe("4) Testing 4", () => {
       mintedTimestampAccountBalance,
     );
   });
+
   it("4.13) Attempt to mint more free tokens than can be minted per epoch", async () => {
     // Situation when more users attempt to mint free tokens than can be minted.
 
@@ -803,11 +801,7 @@ describe("4) Testing 4", () => {
       [user, liteAuthority],
     );
 
-    if (metadata instanceof FailedTransactionMetadata) {
-      assert(false);
-    } else {
-      assert(true);
-    }
+    assert(metadata instanceof TransactionMetadata);
     const freeTokensCounterDataAfter = getFreeTokensCounterAccount();
 
     assert(
@@ -835,8 +829,8 @@ describe("5) Buying HXUI tokens for users[0]", async () => {
     }
   });
 
-  const tokens = 10;
-  it("users[0] and users[1] buys 10 HXUI tokens each without an associated token account.", async () => {
+  const tokens = 100;
+  it("users[0] and users[1] buys 100 HXUI tokens each without an associated token account.", async () => {
     const tokenAddress = getAssociatedTokenAddressSync(
       getPda(SEEDS.hxuiMint).address,
       users[0].publicKey,
@@ -882,9 +876,9 @@ describe("5) Buying HXUI tokens for users[0]", async () => {
     );
     sendTransaction([ix2], [users[1]]);
   });
-  //  users[0] and users[1] has 10 HXUI tokens
+  //  users[0] and users[1] has 100 HXUI tokens
   // x----------------------------x
-  it("users[0] buying 10 HXUI tokens with an associated token account.", () => {
+  it("users[0] buying 100 HXUI tokens with an associated token account.", () => {
     const usersBalanceBefore = svm.getBalance(users[0].publicKey);
 
     const ix = getBuyPaidTokensInstruction(
@@ -911,7 +905,7 @@ describe("5) Buying HXUI tokens for users[0]", async () => {
   });
 });
 
-//  users[0] has 20 HXUI tokens and users[1] has 10 HXUI tokens
+//  users[0] has 200 HXUI tokens and users[1] has 100 HXUI tokens
 // x----------------------------x
 
 interface Candidate {
@@ -951,18 +945,7 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
       const mintIx = getMintFreeTokensInstruction({ to: users[i].publicKey });
       ixs.push(tokenCreationIx, registerIx, mintIx);
     }
-
     sendTransaction(ixs, [liteAuthority, ...users]);
-    const ixs2: TransactionInstruction[] = [];
-
-    for (let i = 0; i < users.length; i++) {
-      const clock = svm.getClock();
-      clock.unixTimestamp = clock.unixTimestamp + BigInt(43200);
-      svm.setClock(clock);
-      const mintIx = getMintFreeTokensInstruction({ to: users[i].publicKey });
-      ixs2.push(mintIx);
-    }
-    sendTransaction(ixs2, [liteAuthority]);
 
     for (let i = 0; i < users.length; i++) {
       const hxuiLiteTokenAccount = getHxuiLiteAccount(users[i].publicKey);
@@ -970,13 +953,31 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
         hxuiLiteTokenAccount.mint.equals(getPda(SEEDS.hxuiLiteMint).address),
       );
       assert(hxuiLiteTokenAccount.owner.equals(users[i].publicKey));
-      assert.equal(hxuiLiteTokenAccount.amount, BigInt(2));
+      assert.equal(hxuiLiteTokenAccount.amount, BigInt(1));
+    }
+
+    //Minting free tokens for users[0] for testing.
+    for (let i = 0; i < 24; i++) {
+      const clock = svm.getClock();
+      clock.unixTimestamp = clock.unixTimestamp + BigInt(COOLDOWN);
+      svm.setClock(clock);
+      const ixs = [];
+      for (let i = 0; i < users.length - 1; i++) {
+        const mintIx = getMintFreeTokensInstruction({ to: users[i].publicKey });
+        ixs.push(mintIx);
+      }
+      const metadata = sendTransaction(ixs, [liteAuthority]);
+      assert(metadata instanceof TransactionMetadata);
+    }
+    for (let i = 0; i < users.length - 1; i++) {
+      const tokenAccount = getHxuiLiteAccount(users[i].publicKey);
+      assert.equal(tokenAccount.amount, BigInt(25));
     }
   });
 
   // users.length = 3
-  // usersHXUITokenBalance = [20,10,0]
-  // usersHXUILiteTokenBalance = [2,2,2]
+  // usersHXUITokenBalance = [200,100,0]
+  // usersHXUILiteTokenBalance = [25,25,1]
 
   it("5.1) Creating 8 candidates to test all scenarios.", async () => {
     const candidateName = "Lorem ipsum dolor sit amet, 4321";
@@ -1090,23 +1091,24 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
       }
     }
     // users.length = 3
-    // usersHXUITokenBalance = [20,10,0]
-    // usersHXUILiteTokenBalance = [2,2,2]
+    // usersHXUITokenBalance = [200,100,0]
+    // usersHXUILiteTokenBalance = [25,25,1]
     // activeCandidatesStatus = [active,active,active,active(claimable),active(claimable),active(claimable),active,active]
   });
-  it("5.2) users[0] gives 1 vote to activeCandidates[0] with HXUILite tokens", async () => {
+  it("5.2) users[1] gives 1 vote to activeCandidates[0] with HXUILite tokens", async () => {
     const votes = 1;
 
     const candidateAccountBefore = getCandidateAccount(
       activeCandidates[0].name,
     );
-    const tokenAccountStateBefore = getHxuiLiteAccount(users[0].publicKey);
+    const tokenAccountStateBefore = getHxuiLiteAccount(users[1].publicKey);
 
     const ix = getVoteCandidateWithHxuiLiteInstruction(
-      { owner: users[0].publicKey },
+      { owner: users[1].publicKey },
       { _name: activeCandidates[0].name, votes: new anchor.BN(votes) },
     );
-    sendTransaction([ix], [users[0]]);
+    const metadata = sendTransaction([ix], [users[1]]);
+    assert(metadata instanceof TransactionMetadata);
 
     const candidateStateAfter = getCandidateAccount(activeCandidates[0].name);
     assert(
@@ -1114,7 +1116,7 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
         .sub(candidateAccountBefore.number_of_votes)
         .eq(new anchor.BN(votes)),
     );
-    const tokenAccountStateAfter = getHxuiLiteAccount(users[0].publicKey);
+    const tokenAccountStateAfter = getHxuiLiteAccount(users[1].publicKey);
 
     const hxuiConfigState = getConfigAccount();
     assert(
@@ -1125,16 +1127,17 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
   });
 
   // users.length = 3
-  // usersHXUITokenBalance = [20,10,0]
-  // usersHXUILiteTokenBalance = [0,2,2]
+  // usersHXUITokenBalance = [200,100,0]
+  // usersHXUILiteTokenBalance = [25,23,1]
   // activeCandidatesStatus = [active,active,active,active(claimable),active(claimable),active(claimable),active,active]
-  // activeCandidateVotesWithReceipts = [1 (0),0,0,0,0,0,0,0]
+  // activeCandidateVotesWithReceipts = [1(0),0,0,0,0,0,0,0]
 
-  it("5.2) users[0] gives (0,1,2,0,1,2,0,1) votes to 8 candidates with HXUI paid tokens. PDA vault as rent payer for receipts.", async () => {
-    const user = users[0];
-    for (let i = 0; i < activeCandidates.length; i++) {
-      const votes = i % 3;
-      if (votes > 0) {
+  it("5.2) users gives (0(0),12(1),24(1),10(0),12(1),24(1),10(0),12(1)) votes to candidates with HXUI paid tokens and HXUILite tokens. PDA vault as rent payer for receipts ().", async () => {
+    for (let i = 1; i < activeCandidates.length; i++) {
+      if (i % 3 !== 0) {
+        const user = users[0];
+        const votes = (i % 3) * 12;
+
         const candidateAccountBefore = getCandidateAccount(
           activeCandidates[i].name,
         );
@@ -1154,7 +1157,8 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
             votes: new anchor.BN(votes),
           },
         );
-        sendTransaction([ix], [user]);
+        const metadata = sendTransaction([ix], [user]);
+        assert(metadata instanceof TransactionMetadata);
         const vaultBalanceAfter = svm.getBalance(
           getPda(SEEDS.hxuiVault).address,
         );
@@ -1193,13 +1197,55 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
 
         // one receipt per voter per candidate. irrespective of votes.
         assert(voteReceipt.tokens.eq(tokensSpent));
+      } else {
+        // give 10 votes with free tokens to the candidates which should not create a receipt.
+        const user = users[i / 3 - 1]; // i will either be 3 and 6
+        const votes = 10;
+        const candidateAccountBefore = getCandidateAccount(
+          activeCandidates[i].name,
+        );
+
+        const tokenAccountBefore = getHxuiLiteAccount(user.publicKey);
+        const ix = getVoteCandidateWithHxuiLiteInstruction(
+          { owner: user.publicKey },
+          {
+            _name: activeCandidates[i].name,
+            votes: new anchor.BN(votes),
+          },
+        );
+        const metadata = sendTransaction([ix], [user]);
+        assert(metadata instanceof TransactionMetadata);
+        const candidateAccountAfter = getCandidateAccount(
+          activeCandidates[i].name,
+        );
+        const tokenAccountAfter = getHxuiLiteAccount(user.publicKey);
+
+        assert(
+          candidateAccountAfter.number_of_votes
+            .sub(candidateAccountBefore.number_of_votes)
+            .eq(new anchor.BN(votes)),
+        );
+        assert(
+          candidateAccountAfter.total_receipts
+            .sub(candidateAccountBefore.total_receipts)
+            .eq(new anchor.BN(0)),
+          "A receipt was indeed created",
+        );
+        const config = getConfigAccount();
+
+        const tokensSpent = new anchor.BN(
+          tokenAccountBefore.amount - tokenAccountAfter.amount,
+        );
+        assert(
+          tokensSpent.eq(config.tokens_per_vote.mul(new anchor.BN(votes))),
+        );
       }
     }
   });
-  // usersHXUITokenBalance = [6,10,0]
-  // usersHXUILiteTokenBalance = [2,4,4]
+  // usersHXUITokenBalance = [32,100,0]
+  // usersHXUILiteTokenBalance = [5,3,1]
   // activeCandidatesStatus = [active,active,active,active(claimable),active(claimable),active(claimable),active,active]
-  // activeCandidateVotesWithReceipts = [1(0),1(1),2(1),0(0),1(1),2(1),0(0),1(1)]
+  // activeCandidateVotesWithReceipts = [1(0),12(1),24(1),10(0),12(1),24(1),10(0),12(1)]
   it("5.3) users[0] voting the previously voted candidate (activeCandidates[2]) does not create a new receipt rather mutates the old one.", () => {
     const user = users[0];
     const candidateName = activeCandidates[2].name;
@@ -1231,10 +1277,10 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
       ),
     );
   });
-  // usersHXUITokenBalance = [4,10,0]
-  // usersHXUILiteTokenBalance = [2,4,4]
+  // usersHXUITokenBalance = [30,100,0]
+  // usersHXUILiteTokenBalance = [5,3,1]
   // activeCandidatesStatus = [active,active,active,active(claimable),active(claimable),active(claimable),active,active]
-  // activeCandidateVotesWithReceipts = [1(0),1(1),3(1),0(0),1(1),2(1),0(0),1(1)]
+  // activeCandidateVotesWithReceipts = [1(0),12(1),25(1),10(0),12(1),24(1),10(0),12(1)]
   it("Attempt to close an Active candidate with 0 receipts (eg. activeCandidates[0]).", async () => {
     // Only a non active 0 receipts account can be closed.
 
@@ -1253,7 +1299,7 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
     assertTxFailedWithErrorCode(failed, "ActiveCandidateCannotBeClosed");
   });
 
-  it("5.4)***** Set claimback offer for an active candidate after initialisation", () => {
+  it("5.4 Set claimback offer for an active candidate after initialisation", () => {
     const candidateName = activeCandidates[0].name;
     const candidateStateBefore = getCandidateAccount(candidateName);
     assert(
@@ -1268,10 +1314,11 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
     const candidateStateAfter = getCandidateAccount(candidateName);
     assert.equal(candidateStateAfter.claimable_if_winner, true, "2");
   });
-  // usersHXUITokenBalance = [4,10,0]
-  // usersHXUILiteTokenBalance = [2,4,4]
+  // usersHXUITokenBalance = [30,100,0]
+  // usersHXUILiteTokenBalance = [5,3,1]
   // activeCandidatesStatus = [active(claimable),active,active,active(claimable),active(claimable),active(claimable),active,active]
-  // activeCandidateVotesWithReceipts = [1(0),1(1),3(1),0(0),1(1),2(1),0(0),1(1)]
+  // activeCandidateVotesWithReceipts = [1(0),12(1),25(1),10(0),12(1),24(1),10(0),12(1)]
+
   it("5.4) Withdraw the first 3 active candidates in activeCandidates.", async () => {
     //Also verified the activeCandidates[0..2] are unclaimble candidates with 0,1,2 votes respectively and are withdrawn.
     for (let i = 0; i < 3; i++) {
@@ -1299,10 +1346,10 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
     activeCandidates.slice(3);
   });
   // users.length = 3
-  // usersHXUITokenBalance = [4,10,0]
-  // usersHXUILiteTokenBalance = [2,4,4]
+  // usersHXUITokenBalance = [30,100,0]
+  // usersHXUILiteTokenBalance = [5,3,1]
   // activeCandidatesStatus = [withdrawn,withdrawn,withdrawn,active(claimable),active(claimable),active(claimable),active,active]
-  // activeCandidateVotesWithReceipts = [1(0),1(1),3(1),0(0),1(1),2(1),0(0),1(1)]
+  // activeCandidateVotesWithReceipts = [1(0),12(1),25(1),10(0),12(1),24(1),10(0),12(1)]
 
   it("5.5) Picking 5 winners (all the 5 left active candidates) immediately after the end of each poll by time travelling.", async () => {
     for (let i = 0; i < 5; i++) {
@@ -1315,7 +1362,10 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
         const candidateAddress = activeCandidates[i].address;
 
         const candidateAccount = getCandidateAccount(activeCandidates[i].name);
-        if (candidateAccount.candidate_status.Active) {
+        if (
+          candidateAccount.candidate_status.Active &&
+          candidateAccount.number_of_votes.cmp(new anchor.BN(10)) !== -1
+        ) {
           if (
             expectedWinnerCandidateId == undefined ||
             candidateAccount.number_of_votes.cmp(maxVotes) == 1 ||
@@ -1413,19 +1463,19 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
     // }
   });
   /*
-  usersHXUITokenBalance = [4,10,0]
-usersHXUILiteTokenBalance = [2,4,4]
+   usersHXUITokenBalance = [30,100,0]
+   usersHXUILiteTokenBalance = [5,3,1]
 activeCandidatesStatus = [withdrawn,withdrawn,withdrawn,winner(claimable),winner(claimable),winner(claimable),winner,winner]
 
-activeCandidateVotesWithReceipts = [1(0),1(1),3(1),0(0),1(1),2(1),0(0),1(1)] 
+  // activeCandidateVotesWithReceipts = [1(0),12(1),25(1),10(0),12(1),24(1),10(0),12(1)]
 
 newCandidates = {
-    claimableWinner:[0(0),1(1),2(1)],
-    winner:[0(0),1(1)],
-    withdrawn:[1(0),1(1),3(1)]
+    claimableWinner:[10(0),12(1),24(1)],
+    winner:[10(0),12(1)],
+    withdrawn:[1(0),12(1),25(1)]
   }
-newCandidates.claimableWinner[0] means winner with claimable with 0 votes.
-EXCEPT -> newCandidates.withdrawn[2] has 3 votes.
+newCandidates.claimableWinner[i] where i > 0 implies winner with claimable with ~ i * 12 votes.
+similarly for withdrawn and winner
 */
 });
 
@@ -1607,9 +1657,9 @@ describe("Advance candidate testing", () => {
   });
 
   // newCandidates = {
-  //     claimableWinner:[0(0),1(1),2(1)],
-  //     winner:[0(0),1(1)],
-  //     withdrawn:[1(0),1(1),3(1)]
+  //     claimableWinner:[10(0),12(1),24(1)],
+  //     winner:[10(0),12(1)],
+  //     withdrawn:[1(0),12(1),25(1)]
   //   }
   function closeNonActiveCandidate(
     nonActiveCandidateName: string,
@@ -1644,9 +1694,9 @@ describe("Advance candidate testing", () => {
   });
 
   // newCandidates = {
-  //     claimableWinner:[0(0),1(1),2(1)],
-  //     winner:[0(0),1(1)],
-  //     withdrawn:[1(0),1(1),3(1)]
+  //     claimableWinner:[10(0),12(1),24(1)],
+  //     winner:[10(0),12(1)],
+  //     withdrawn:[1(0),12(1),25(1)]
   //   }
 
   function getClearReceiptInstruction(
@@ -1693,7 +1743,7 @@ describe("Advance candidate testing", () => {
     checkNonActiveCandidateWith(nonActiveCandidateName, state);
 
     /*
-    liteSVM does not have a .getProgramAccountsMethod() which will help us get all the vote recreipts for an candidate by filter them with VoteReceipt::DISCRIMINATOR and the candidate_id. The "crankscript-test" tests this with anchor typescript client using.
+    liteSVM does not have a .getProgramAccounts()method which will help us get all the vote receipts for a candidate by filtering them with VoteReceipt::DISCRIMINATOR and the candidate_id. The "crankscript.test.ts" this with anchor typescript client.
 
     const allVoteReceipts = await program.account.voteReceipt.all([
       {
@@ -1706,7 +1756,7 @@ describe("Advance candidate testing", () => {
     ]);
       */
 
-    //SIMULATING the above process, as we know the only voter with hxuiMint for any candidate is the users[0], so we will fetch its address and construct a allVoteReceipts.
+    //SIMULATING the above process, as we know the only voter with hxuiMint for any candidate is the users[0], so we will fetch its address and construct a response of above requrest - allVoteReceipts.
 
     const voteReceiptAddress = getVoteReceiptPda(
       nonActiveCandidateName,
@@ -1784,11 +1834,11 @@ describe("Advance candidate testing", () => {
     assertTxFailedWithErrorCode(failed2, "OpenWithdrawWindowFirst.");
   });
 
-  // newCandidate.winner[1] HAS 0 RECEIPTS NOW. USE IT WITH CONSIDERTION.
+  // newCandidates.winner[1] HAS 0 RECEIPTS NOW. USE IT WITH CONSIDERTION.
   // newCandidates = {
-  //     claimableWinner:[0(0),1(1),2(1)],
-  //     winner:[0(0),1(0)],
-  //     withdrawn:[1(0),1(1),3(1)]
+  //     claimableWinner:[10(0),12(1),24(1)],
+  //     winner:[10(0),12(0)],
+  //     withdrawn:[1(0),12(1),25(1)]
   //   }
 
   it("Attempt to close Non-active candidates before a withdraw window given all candidates have ZERO receipts.", async () => {
@@ -1826,13 +1876,12 @@ describe("Advance candidate testing", () => {
       assert(false);
     }
   });
-  // newCandidates.winner[1], newCandidates.claimableWinner[0], newCandidates.withdrawn[0] IS CLOSED.
-  // newCandidates = {
-  //     claimableWinner:[0(0,closed),1(1),2(1)],
-  //     winner:[0(0),1(0,closed)],
-  //     withdrawn:[1(0,closed),1(1),3(1)]
-  //   }
 
+  // newCandidates = {
+  //     claimableWinner:[10(0,closed),12(1),24(1)],
+  //     winner:[10(0),12(0,closed)],
+  //     withdrawn:[1(0,closed),12(1),25(1)]
+  //   }
   function getOpenWithdrawWindowInstruction(instructionArgs: {
     nonActiveCandidateName: string;
     until: anchor.BN;
@@ -1917,11 +1966,11 @@ describe("Advance candidate testing", () => {
     );
     assertTxFailedWithErrorCode(failed2, "WaitUntilWithdrawWindowIsClosed");
   });
-  // same state
+  // NO CHANGE
   // newCandidates = {
-  //     claimableWinner:[0(0,closed),1(1),2(1)],
-  //     winner:[0(0),1(0,closed)],
-  //     withdrawn:[1(0,closed),1(1),2(1)]
+  //     claimableWinner:[10(0,closed),12(1),24(1)],
+  //     winner:[10(0),12(0,closed)],
+  //     withdrawn:[1(0,closed),12(1),25(1)]
   //   }
   it("Attempt to close Non active candidates during a withdraw window given all candidates has Non zero receipts.", async () => {
     const failed = closeNonActiveCandidate(
@@ -1936,11 +1985,11 @@ describe("Advance candidate testing", () => {
     });
     assertTxFailedWithErrorCode(failed2, "WaitUntilWithdrawWindowIsClosed");
   });
-  //same state.
+  // NO CHANGE
   // newCandidates = {
-  //     claimableWinner:[0(0,closed),1(1),2(1)],
-  //     winner:[0(0),1(0,closed)],
-  //     withdrawn:[1(0,closed),1(1),2(1)]
+  //     claimableWinner:[10(0,closed),12(1),24(1)],
+  //     winner:[10(0),12(0,closed)],
+  //     withdrawn:[1(0,closed),12(1),25(1)]
   //   }
   it("Attempt to claim tokens for a non active candidate during a withdraw window given each non active candidate have NON-ZERO receipts.", async () => {
     const tokenAccountBefore = getHxuiAccount(users[0].publicKey);
@@ -2004,11 +2053,10 @@ describe("Advance candidate testing", () => {
   });
   // newCandidates.claimableWinner[1] AND newCandidates.withdrawn[1] RECEIPTS ARE CLEARED.
   // newCandidates = {
-  //     claimableWinner:[0(0,closed),1(0),2(1)],
-  //     winner:[0(0),1(0,closed)],
-  //     withdrawn:[1(0,closed),1(0),2(1)]
+  //     claimableWinner:[10(0,closed),12(0),24(1)],
+  //     winner:[10(0),12(0,closed)],
+  //     withdrawn:[1(0,closed),12(0),25(1)]
   //   }
-
   it("Attempt to close a Non active candidate during a withdraw window given each non active candidate has exactly 0 receipts", async () => {
     const result = closeNonActiveCandidate(
       newCandidates.claimableWinner[1].name,
@@ -2029,13 +2077,12 @@ describe("Advance candidate testing", () => {
       assert(false);
     }
   });
-  // newCandidates.winner[1] AND newCandidates.withdrawn[1] RECEIPTS ARE CLEARED AND CLOSED.
+  // newCandidates.claimableWinner[1] AND newCandidates.withdrawn[1] RECEIPTS ARE CLEARED AND CLOSED.
   // newCandidates = {
-  //     claimableWinner:[0(0,closed),1(0,closed),2(1)],
-  //     winner:[0(0),1(0,closed)],
-  //     withdrawn:[1(0,closed),1(0,closed),2(1)]
+  //     claimableWinner:[10(0,closed),12(0,closed),24(1)],
+  //     winner:[10(0),12(0,closed)],
+  //     withdrawn:[1(0,closed),12(0,closed),25(1)]
   //   }
-
   it("Open and close withdraw window for non withdrawn and claimable winner candidate.", async () => {
     const now = svm.getClock();
     const until = now.unixTimestamp + BigInt(14 * 86400);
@@ -2082,11 +2129,11 @@ describe("Advance candidate testing", () => {
     );
     assertTxFailedWithErrorCode(failed2, "UnclaimableNow");
   });
-  // No change.
+  // NO CHANGE
   // newCandidates = {
-  //     claimableWinner:[0(0,closed),1(0,closed),2(1)],
-  //     winner:[0(0),1(0,closed)],
-  //     withdrawn:[1(0,closed),1(0,closed),2(1)]
+  //     claimableWinner:[10(0,closed),12(0,closed),24(1)],
+  //     winner:[10(0),12(0,closed)],
+  //     withdrawn:[1(0,closed),12(0,closed),25(1)]
   //   }
   it("Attempt to close a Non active candidate after a withdraw window given each non active candidate have NON ZERO receipts.", async () => {
     // Non zero receipts
@@ -2103,11 +2150,11 @@ describe("Advance candidate testing", () => {
     );
     assertTxFailedWithErrorCode(failed2, "CloseAllReceiptAccount");
   });
-  // No change.
+  // NO CHANGE
   // newCandidates = {
-  //     claimableWinner:[0(0,closed),1(0,closed),2(1)],
-  //     winner:[0(0),1(0,closed)],
-  //     withdrawn:[1(0,closed),1(0,closed),2(1)]
+  //     claimableWinner:[10(0,closed),12(0,closed),24(1)],
+  //     winner:[10(0),12(0,closed)],
+  //     withdrawn:[1(0,closed),12(0,closed),25(1)]
   //   }
   it("Attempt to clear receipts for a non active candidate after a withdraw window where each non active candidate have non zero receipts", async () => {
     const result = clearReceiptForNonActiveCandidate(
@@ -2129,11 +2176,10 @@ describe("Advance candidate testing", () => {
 
   // newCandidates.claimableWinner[2] and newCandidates.withdrawn[2] RECEIPTS ARE CLEARED.
   // newCandidates = {
-  //     claimableWinner:[0(0,closed),1(0,closed),2(0)],
-  //     winner:[0(0),1(0,closed)],
-  //     withdrawn:[1(0,closed),1(0,closed),2(0)]
+  //     claimableWinner:[10(0,closed),12(0,closed),24(0)],
+  //     winner:[10(0),12(0,closed)],
+  //     withdrawn:[1(0,closed),12(0,closed),25(0)]
   //   }
-
   it("Attempt to close Non-active candidates after a withdraw window given all candidates have ZERO receipts.", async () => {
     const result = closeNonActiveCandidate(
       newCandidates.claimableWinner[2].name,
@@ -2151,12 +2197,16 @@ describe("Advance candidate testing", () => {
     }
   });
 
-  // newCandidates.claimableWinner[2] and newCandidates.withdrawn[2] RECEIPTS ARE CLOSED.
+  // newCandidates.claimableWinner[2] and newCandidates.withdrawn[2] RECEIPTS ARE CLEARED.
   // newCandidates = {
-  //     claimableWinner:[0(0,closed),1(0,closed),2(0,closed)],
-  //     winner:[0(0),1(0,closed)],
-  //     withdrawn:[1(0,closed),1(0,closed),2(0,closed)]
+  //     claimableWinner:[10(0,closed),12(0,closed),24(0,closed)],
+  //     winner:[10(0),12(0,closed)],
+  //     withdrawn:[1(0,closed),12(0,closed),25(0,closed)]
   //   }
+
+  it(
+    "Attempt to draw winner when no active candidates have more than or equal to 10 votes.",
+  );
 });
 
 describe("6)Withdrawl and financing the vote receipts.", () => {
