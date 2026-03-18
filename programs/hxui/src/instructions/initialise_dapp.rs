@@ -6,7 +6,7 @@ use spl_token_metadata_interface::state::TokenMetadata;
 use spl_type_length_value::variable_len_pack::VariableLenPack;
 
 
-use crate::{ANCHOR_DISCRIMINATOR, Config, CustomError, FREE_TOKENS_PER_EPOCH, FreeTokensCounter, VoteReceipt};
+use crate::{ANCHOR_DISCRIMINATOR, Config, CustomError, FREE_TOKENS_PER_EPOCH, FreeTokensCounter, Poll, VoteReceipt};
 #[derive(Accounts)]
 pub struct InitialiseDapp<'info>{
     #[account(mut)]
@@ -59,6 +59,15 @@ pub struct InitialiseDapp<'info>{
     )]
     pub free_tokens_counter:Account<'info,FreeTokensCounter>,
 
+        #[account(
+        init,
+        payer = admin,
+        space = ANCHOR_DISCRIMINATOR + Poll::INIT_SPACE,
+        seeds = [b"hxui_poll"],
+        bump,
+    )]
+    pub hxui_poll:Account<'info,Poll>,
+
     pub system_program:Program<'info,System>,
     pub token_program:Program<'info,Token2022>
 }
@@ -69,6 +78,9 @@ pub struct TokenMetadataArgs {
     uri:String,
 }
 pub fn initialise_config(ctx:Context<InitialiseDapp>,config:Config)->Result<()>{
+
+    let poll_account = &mut ctx.accounts.hxui_poll;
+    poll_account.bump = ctx.bumps.hxui_poll;
     let rent = Rent::get()?;
     require!(2* config.price_per_token >= rent.minimum_balance(VoteReceipt::INIT_SPACE) ,CustomError::TokenPriceNotSufficient);
     let config_account = &mut ctx.accounts.hxui_config;

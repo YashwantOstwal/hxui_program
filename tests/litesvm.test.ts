@@ -146,6 +146,11 @@ describe("1) initialise_dapp instruction testing", () => {
           isSigner: false,
           isWritable: true,
         },
+        {
+          pubkey: getPda(SEEDS.hxuiPoll).address,
+          isSigner: false,
+          isWritable: true,
+        },
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
         { pubkey: TOKEN_2022_PROGRAM_ID, isSigner: false, isWritable: false },
       ],
@@ -265,13 +270,23 @@ describe("1) initialise_dapp instruction testing", () => {
     assert(hxuiLiteMintData.mintAuthority.equals(liteAuthority.publicKey));
     assert(hxuiLiteMintData.freezeAuthority === null);
   });
+
+  it("1.4) Poll account created.", () => {
+    const pollAccountData = getPollAccount();
+    assert(pollAccountData !== null, "1");
+    assert(pollAccountData.current_poll_deadline.isZero(), "2");
+    assert.equal(pollAccountData.current_poll_winner_drawn, false, "3");
+    assert.equal(pollAccountData.total_candidates, 0);
+    assert.equal(pollAccountData.current_poll_candidates.length, 0);
+    assert.equal(pollAccountData.bump, getPda(SEEDS.hxuiPoll).bump);
+  });
 });
 
 describe("2) Poll creation testing", () => {
   it("2.1) Creating a Genesis poll with valid deadline.", () => {
     const now = svm.getClock();
     const poll_deadline = new anchor.BN(now.unixTimestamp + BigInt(86400 * 7)); // 1 week from now.
-    const adminBalanceBefore = svm.getBalance(adminPubkey);
+    // const adminBalanceBefore = svm.getBalance(adminPubkey);
 
     const data = coder.instruction.encode("create_poll", {
       poll_deadline,
@@ -302,17 +317,7 @@ describe("2) Poll creation testing", () => {
 
     sendTransaction([ix], [admin]);
 
-    const adminBalanceAfter = svm.getBalance(adminPubkey);
-
-    const pollRent = svm.getBalance(getPda(SEEDS.hxuiPoll).address);
-    // admin paid for the poll rent.
-    assert.equal(adminBalanceBefore - adminBalanceAfter, pollRent);
-
-    const pollAccount = svm.getAccount(getPda(SEEDS.hxuiPoll).address);
-    const pollAccountData = coder.accounts.decode(
-      "Poll",
-      Buffer.from(pollAccount.data),
-    );
+    const pollAccountData = getPollAccount();
 
     assert(pollAccountData.current_poll_deadline.eq(poll_deadline));
     assert.equal(pollAccountData.current_poll_winner_drawn, false);
@@ -362,12 +367,7 @@ describe("2) Poll creation testing", () => {
     clock.unixTimestamp = clock.unixTimestamp + BigInt(7 * 86400 + 1); // Time travelling to the next second after the end of poll.
     svm.setClock(clock);
 
-    const pollAccount = svm.getAccount(getPda(SEEDS.hxuiPoll).address);
-    const pollAccountData = coder.accounts.decode(
-      "Poll",
-      Buffer.from(pollAccount.data),
-    );
-
+    const pollAccountData = getPollAccount();
     // Ensuring the poll has ended.
     assert(
       clock.unixTimestamp > pollAccountData.current_poll_deadline.toNumber(),

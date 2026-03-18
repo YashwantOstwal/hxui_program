@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{Config,Poll,ANCHOR_DISCRIMINATOR,CustomError};
+use crate::{Config,Poll,CustomError};
 #[derive(Accounts)]
 pub struct CreatePoll<'info>{
     #[account(mut)]
@@ -14,11 +14,9 @@ pub struct CreatePoll<'info>{
     pub hxui_config:Account<'info,Config>,
 
     #[account(
-        init_if_needed,
-        payer = admin,
-        space = ANCHOR_DISCRIMINATOR + Poll::INIT_SPACE,
+        mut,
         seeds = [b"hxui_poll"],
-        bump,
+        bump = hxui_poll.bump,
     )]
     pub hxui_poll:Account<'info,Poll>,
 
@@ -35,6 +33,5 @@ pub fn create_new_poll(ctx:Context<CreatePoll>,new_deadline:i64)->Result<()>{
     require!(new_deadline > clock.unix_timestamp,CustomError::InvalidDeadline);
         poll.current_poll_deadline = new_deadline;
         poll.current_poll_winner_drawn = false;
-    poll.bump = ctx.bumps.hxui_poll;
     Ok(())
 }

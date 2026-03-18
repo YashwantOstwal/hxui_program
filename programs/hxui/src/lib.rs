@@ -10,7 +10,7 @@ pub use states::*;
 pub use constants::*;
 pub use errors::*;
 
-declare_id!("GpTybHnUiPQdYE3WnnzDKKpwZ2kWkt651yP9cTfNoyTN");
+declare_id!("6jVyroPEKqPgGv7uaHZpQ3Enqriyy1MXG7pcdLTud3mP");
 #[program]
 pub mod hxui {
 
