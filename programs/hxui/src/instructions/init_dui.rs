@@ -6,9 +6,9 @@ use spl_token_metadata_interface::state::TokenMetadata;
 use spl_type_length_value::variable_len_pack::VariableLenPack;
 
 
-use crate::{ANCHOR_DISCRIMINATOR, HxuiConfig, CustomError, FREE_TOKENS_PER_EPOCH, HxuiFreeMintCounter, HxuiDropTime, VoteReceipt};
+use crate::{ANCHOR_DISCRIMINATOR, CustomError, HxuiConfig, HxuiDropTime, HxuiFreeMintCounter, VoteReceipt};
 #[derive(Accounts)]
-pub struct InitialiseDapp<'info>{
+pub struct InitDui<'info>{
     #[account(mut)]
     pub admin:Signer<'info>,
 
@@ -57,7 +57,7 @@ pub struct InitialiseDapp<'info>{
         bump,
         space = ANCHOR_DISCRIMINATOR + HxuiFreeMintCounter::INIT_SPACE
     )]
-    pub free_tokens_counter:Account<'info,HxuiFreeMintCounter>,
+    pub hxui_free_mint_counter:Account<'info,HxuiFreeMintCounter>,
 
         #[account(
         init,
@@ -77,19 +77,22 @@ pub struct TokenMetadataArgs {
     symbol:String,
     uri:String,
 }
-pub fn initialise_config(ctx:Context<InitialiseDapp>,config:HxuiConfig)->Result<()>{
+pub fn process_init_dui(
+ctx:Context<InitDui>,price_per_token:u64,tokens_per_vote:u64,
+         free_tokens_per_mint:u64,
+     free_mints_per_epoch:u64,
+     free_mint_cool_down:i64,)->Result<()>{
+         let hxui_drop_time = &mut ctx.accounts.hxui_drop_time;
+         hxui_drop_time.bump = ctx.bumps.hxui_drop_time;
+         let rent = Rent::get()?;
+         require!(tokens_per_vote * price_per_token >= rent.minimum_balance(VoteReceipt::INIT_SPACE) ,CustomError::TokenPriceNotSufficient);
+         let hxui_config = &mut ctx.accounts.hxui_config;
+    hxui_config.set_inner(HxuiConfig { admin: ctx.accounts.admin.key(), price_per_token, tokens_per_vote, free_tokens_per_mint, free_mints_per_epoch, free_mint_cool_down, bump: ctx.bumps.hxui_config } );
 
-    let poll_account = &mut ctx.accounts.hxui_drop_time;
-    poll_account.bump = ctx.bumps.hxui_drop_time;
-    let rent = Rent::get()?;
-    require!(2* config.price_per_token >= rent.minimum_balance(VoteReceipt::INIT_SPACE) ,CustomError::TokenPriceNotSufficient);
-    let config_account = &mut ctx.accounts.hxui_config;
-    config_account.set_inner(config);
-
-    let free_tokens_counter = &mut ctx.accounts.free_tokens_counter;
-    free_tokens_counter.bump = ctx.bumps.free_tokens_counter;
-    free_tokens_counter.current_epoch = (Clock::get()?).epoch;
-    free_tokens_counter.remaining_free_mints = FREE_TOKENS_PER_EPOCH;
+    let hxui_free_mint_counter = &mut ctx.accounts.hxui_free_mint_counter;
+    hxui_free_mint_counter.bump = ctx.bumps.hxui_free_mint_counter;
+    hxui_free_mint_counter.current_epoch = (Clock::get()?).epoch;
+    hxui_free_mint_counter.remaining_free_mints = free_mints_per_epoch;
 
     let cpi_context = CpiContext::new(ctx.accounts.system_program.to_account_info(),Transfer{
         from:ctx.accounts.admin.to_account_info(),

@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::{ANCHOR_DISCRIMINATOR,FreeMintTracker};
 #[derive(Accounts)]
-pub struct RegisterFreeTokens<'info>{
+pub struct RegisterForFreeMint<'info>{
     #[account(mut)]
     pub owner:Signer<'info>,
 
@@ -18,7 +18,7 @@ pub struct RegisterFreeTokens<'info>{
     pub system_program:Program<'info,System>,
 }
 
-pub fn initialise_free_mint_tracker(ctx:Context<RegisterFreeTokens>)->Result<()>{
+pub fn process_register_for_free_mint(ctx:Context<RegisterForFreeMint>)->Result<()>{
     let free_mint_tracker = &mut ctx.accounts.free_mint_tracker;
     let now = Clock::get()?.unix_timestamp;
     free_mint_tracker.next_mint_timestamp = now;

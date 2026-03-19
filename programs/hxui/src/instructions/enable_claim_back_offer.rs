@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use crate::{HxuiConfig,HxuiCandidate,CustomError,CandidateStatus};
 #[derive(Accounts)]
 #[instruction(name:String)]
-pub struct SetClaimBackOffer<'info>{
+pub struct EnableClaimBackOffer<'info>{
 
     pub admin:Signer<'info>,
 
@@ -24,9 +24,9 @@ pub struct SetClaimBackOffer<'info>{
     pub hxui_candidate:Account<'info,HxuiCandidate>
 }
 
-pub fn set_claimable_if_winner(ctx:Context<SetClaimBackOffer>)->Result<()>{
-    let candidate = &mut ctx.accounts.hxui_candidate;
-    candidate.claim_back_offer = true;
+pub fn process_enable_claim_back_offer(ctx:Context<EnableClaimBackOffer>)->Result<()>{
+    let hxui_candidate = &mut ctx.accounts.hxui_candidate;
+    hxui_candidate.claim_back_offer = true;
 
     Ok(())
 }

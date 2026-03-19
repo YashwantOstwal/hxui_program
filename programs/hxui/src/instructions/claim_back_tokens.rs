@@ -56,21 +56,21 @@ pub struct ClaimBackTokens<'info> {
 }
 
 pub fn process_claim_back_tokens(ctx: Context<ClaimBackTokens>) -> Result<()> {
-    let candidate = &mut ctx.accounts.hxui_candidate;
+    let hxui_candidate = &mut ctx.accounts.hxui_candidate;
 
-    let is_withdrawn = candidate.status == CandidateStatus::Withdrawn;
-    let is_claimable_winner = candidate.status == CandidateStatus::ClaimableWinner;
+    let is_withdrawn = hxui_candidate.status == CandidateStatus::Withdrawn;
+    let is_claimable_winner = hxui_candidate.status == CandidateStatus::ClaimableWinner;
     require!(is_withdrawn || is_claimable_winner, CustomError::TokensCannotBeClaimed);
 
     let clock = Clock::get()?;
     require!(
-        candidate.claim_deadline != 0 && clock.unix_timestamp <= candidate.claim_deadline,
+        hxui_candidate.claim_deadline != 0 && clock.unix_timestamp <= hxui_candidate.claim_deadline,
         CustomError::UnclaimableNow
     );
 
     let vote_receipt = &ctx.accounts.vote_receipt;
 
-    candidate.receipt_count -= 1;
+    hxui_candidate.receipt_count -= 1;
     let amount = if is_withdrawn {
         vote_receipt.tokens
     } else {

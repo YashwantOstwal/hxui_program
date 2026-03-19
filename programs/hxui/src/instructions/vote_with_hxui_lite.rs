@@ -7,7 +7,7 @@ use anchor_spl::{
 use crate::{HxuiCandidate, CandidateStatus, HxuiConfig, CustomError};
 #[derive(Accounts)]
 #[instruction(name:String)]
-pub struct VoteCandidateWithHxuiLite<'info>{
+pub struct VoteWithHxuiLite<'info>{
     pub owner:Signer<'info>,
 
     #[account(
@@ -50,12 +50,12 @@ pub struct VoteCandidateWithHxuiLite<'info>{
     pub token_program:Program<'info,Token2022>,
 }
 
-pub fn vote_with_hxui_lite(ctx:Context<VoteCandidateWithHxuiLite>,votes:u64)->Result<()>{
-    let candidate = &mut ctx.accounts.hxui_candidate;
-    let config = & ctx.accounts.hxui_config;
+pub fn process_vote_with_hxui_lite(ctx:Context<VoteWithHxuiLite>,votes:u64)->Result<()>{
+    let hxui_candidate = &mut ctx.accounts.hxui_candidate;
+    let hxui_config = & ctx.accounts.hxui_config;
 
-    let tokens_spent = votes * config.tokens_per_vote;
-    candidate.vote_count += votes;
+    let tokens_spent = votes * hxui_config.tokens_per_vote;
+    hxui_candidate.vote_count += votes;
     let cpi_context = CpiContext::new(ctx.accounts.token_program.to_account_info(),Burn{
         mint:ctx.accounts.hxui_lite_mint.to_account_info(),
         from:ctx.accounts.hxui_lite_token_account.to_account_info(),

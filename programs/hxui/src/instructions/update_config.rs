@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{HxuiConfig};
+use crate::{HxuiConfig, VoteReceipt,CustomError};
 
 #[derive(Accounts)]
 pub struct UpdateConfig<'info> {
@@ -13,18 +13,20 @@ pub struct UpdateConfig<'info> {
 }
 
 pub fn process_update_config(ctx: Context<UpdateConfig> ,price_per_token: Option<u64>, tokens_per_vote: Option<u64>) -> Result<()> {
-    let config_account = &mut ctx.accounts.hxui_config;
+    let hxui_config = &mut ctx.accounts.hxui_config;
 
     if let Some(new_admin) = &ctx.accounts.new_admin {
-        config_account.admin = new_admin.key();
+        hxui_config.admin = new_admin.key();
     }
 
     if let Some(price_per_token) = price_per_token {
-        config_account.price_per_token = price_per_token;
+        let rent = Rent::get()?;
+         require!(hxui_config.tokens_per_vote * hxui_config.price_per_token >= rent.minimum_balance(VoteReceipt::INIT_SPACE) ,CustomError::TokenPriceNotSufficient);
+        hxui_config.price_per_token = price_per_token;
     }
 
     if let Some(tokens_per_vote) = tokens_per_vote {
-        config_account.tokens_per_vote = tokens_per_vote;
+        hxui_config.tokens_per_vote = tokens_per_vote;
     }
 
     Ok(())

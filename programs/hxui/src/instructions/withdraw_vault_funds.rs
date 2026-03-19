@@ -7,7 +7,7 @@ use anchor_spl::{
 
 use crate::{ANCHOR_DISCRIMINATOR, HxuiConfig, CustomError, VoteReceipt};
 #[derive(Accounts)]
-pub struct SafeWithdrawFromVault<'info>{
+pub struct WithdrawVaultFunds<'info>{
     #[account(mut)]
     pub admin:Signer<'info>,
 
@@ -37,7 +37,7 @@ pub struct SafeWithdrawFromVault<'info>{
     pub token_program:Program<'info,Token2022>
 }
 
-pub fn transfer_to_admin(ctx:Context<SafeWithdrawFromVault>,amount:Option<u64>)->Result<()>{
+pub fn process_withdraw_vault_funds(ctx:Context<WithdrawVaultFunds>,amount:Option<u64>)->Result<()>{
     let rent = Rent::get()?;
 
         let hxui_mint = &ctx.accounts.hxui_mint;

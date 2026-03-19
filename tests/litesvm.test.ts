@@ -2674,6 +2674,12 @@ function getMintFreeTokensInstruction(accounts: { to: PublicKey }) {
       { pubkey: accounts.to, isSigner: false, isWritable: false },
       { pubkey: liteAuthority.publicKey, isSigner: true, isWritable: false },
       {
+        pubkey: getPda(SEEDS.hxuiConfig).address,
+        isSigner: false,
+        isWritable: false,
+      },
+
+      {
         pubkey: tokenAddress,
         isSigner: false,
         isWritable: true,

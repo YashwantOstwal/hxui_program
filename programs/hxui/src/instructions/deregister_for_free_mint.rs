@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use crate::{FreeMintTracker,CustomError};
 #[derive(Accounts)]
-pub struct UnregisterFreeTokens<'info>{
+pub struct DeregisterForFreeMint<'info>{
     pub owner:Signer<'info>,
 
     #[account(
@@ -13,7 +13,7 @@ pub struct UnregisterFreeTokens<'info>{
 
 }
 
-pub fn set_close_time(ctx:Context<UnregisterFreeTokens>)->Result<()>{
+pub fn process_deregister_for_free_mint(ctx:Context<DeregisterForFreeMint>)->Result<()>{
     let free_mint_tracker = &mut ctx.accounts.free_mint_tracker;
     require!(!free_mint_tracker.unregistered,CustomError::AlreadyUnregistered);
     free_mint_tracker.unregistered = true;

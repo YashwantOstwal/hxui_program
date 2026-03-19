@@ -8,7 +8,7 @@ use anchor_spl::{
 use crate::{HxuiCandidate, HxuiConfig, CustomError,ANCHOR_DISCRIMINATOR,VoteReceipt, CandidateStatus};
 #[derive(Accounts)]
 #[instruction(name:String)]
-pub struct VoteCandidate<'info>{
+pub struct VoteWithHxui<'info>{
     pub owner:Signer<'info>,
 
     #[account(
@@ -65,14 +65,14 @@ pub struct VoteCandidate<'info>{
     pub token_program:Program<'info,Token2022>,
 }
 
-pub fn vote(ctx:Context<VoteCandidate>,name:String,votes:u64)->Result<()>{
+pub fn process_vote_with_hxui(ctx:Context<VoteWithHxui>,name:String,votes:u64)->Result<()>{
     require!(votes > 0,CustomError::VotesMustBeGreaterThan0);
-    let candidate = &mut ctx.accounts.hxui_candidate;
+    let hxui_candidate = &mut ctx.accounts.hxui_candidate;
     let vote_receipt = &mut ctx.accounts.vote_receipt;
-    let config = & ctx.accounts.hxui_config;
+    let hxui_config = & ctx.accounts.hxui_config;
     let hxui_vault = &mut ctx.accounts.hxui_vault;
 
-    let tokens_spent = votes * config.tokens_per_vote;
+    let tokens_spent = votes * hxui_config.tokens_per_vote;
     if vote_receipt.owner == ctx.program_id {
 
         let mut data = vote_receipt.try_borrow_mut_data()?;
@@ -82,7 +82,7 @@ pub fn vote(ctx:Context<VoteCandidate>,name:String,votes:u64)->Result<()>{
         vote_receipt_data.try_serialize(&mut &mut data[..])?;
     }
     else {
-        candidate.receipt_count +=1;
+        hxui_candidate.receipt_count +=1;
 
         let owner_pubkey = &ctx.accounts.owner.key();
 
@@ -103,14 +103,14 @@ pub fn vote(ctx:Context<VoteCandidate>,name:String,votes:u64)->Result<()>{
 
         let mut data = vote_receipt.try_borrow_mut_data()?;
         let state = VoteReceipt {
-            id:candidate.id,tokens:tokens_spent,bump:ctx.bumps.vote_receipt
+            id:hxui_candidate.id,tokens:tokens_spent,bump:ctx.bumps.vote_receipt
         };
 
         let discriminator: &[u8] = VoteReceipt::DISCRIMINATOR;
         data[..8].copy_from_slice(&discriminator);
         state.serialize(&mut &mut data[8..])?;
     }
-    candidate.vote_count += votes;
+    hxui_candidate.vote_count += votes;
     let cpi_context = CpiContext::new(ctx.accounts.token_program.to_account_info(),Burn{
         mint:ctx.accounts.hxui_mint.to_account_info(),
         from:ctx.accounts.hxui_token_account.to_account_info(),

@@ -25,13 +25,13 @@ pub struct WithdrawCandidate<'info>{
 
 }
 
-pub fn stop_candidate(ctx:Context<WithdrawCandidate>)->Result<()>{
-    let candidate = &mut ctx.accounts.hxui_candidate;
-    candidate.status = CandidateStatus::Withdrawn;
+pub fn process_withdraw_candidate(ctx:Context<WithdrawCandidate>)->Result<()>{
+    let hxui_candidate = &mut ctx.accounts.hxui_candidate;
+    hxui_candidate.status = CandidateStatus::Withdrawn;
 
-    let poll = &mut ctx.accounts.hxui_drop_time;
-  if let Some(index) = poll.active_candidate_ids.iter().position(|&id| id == candidate.id){
-    poll.active_candidate_ids.remove(index);
+    let hxui_drop_time = &mut ctx.accounts.hxui_drop_time;
+  if let Some(index) = hxui_drop_time.active_candidate_ids.iter().position(|&id| id == hxui_candidate.id){
+    hxui_drop_time.active_candidate_ids.remove(index);
   }
     Ok(())
 }

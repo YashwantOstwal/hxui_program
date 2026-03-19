@@ -40,19 +40,15 @@ pub struct CreateCandidate<'info>{
 }
 
 
-pub fn initialise_candidate(ctx:Context<CreateCandidate>,name:String,description:String,claim_back_offer:bool)->Result<()>{
-//    let claimable_basis_points_if_winner = match claimable_bps{
-//         Some(basis_points)=>basis_points,
-//         None=>5000
-//     };
-    let candidate  = &mut ctx.accounts.hxui_candidate;
-    let poll = &mut ctx.accounts.hxui_drop_time;
-    let id = poll.total_candidate_count;
+pub fn process_create_candidate(ctx:Context<CreateCandidate>,name:String,description:String,claim_back_offer:bool)->Result<()>{
+    let hxui_candidate  = &mut ctx.accounts.hxui_candidate;
+    let hxui_drop_time = &mut ctx.accounts.hxui_drop_time;
+    let id = hxui_drop_time.total_candidate_count;
 
-    candidate.set_inner(HxuiCandidate { name, description, vote_count: 0,claim_back_offer, status:CandidateStatus::Active, bump: ctx.bumps.hxui_candidate,claim_deadline:0,id,receipt_count:0 });
+    hxui_candidate.set_inner(HxuiCandidate { name, description, vote_count: 0,claim_back_offer, status:CandidateStatus::Active, bump: ctx.bumps.hxui_candidate,claim_deadline:0,id,receipt_count:0 });
     
-    poll.active_candidate_ids.push(id);
-    poll.total_candidate_count +=1;
+    hxui_drop_time.active_candidate_ids.push(id);
+    hxui_drop_time.total_candidate_count +=1;
     
     Ok(())
 }

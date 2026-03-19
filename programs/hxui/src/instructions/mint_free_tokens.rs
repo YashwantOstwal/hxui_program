@@ -4,13 +4,19 @@ use anchor_spl::{
     associated_token::AssociatedToken,  token_interface::{Mint, MintTo, Token2022, TokenAccount, mint_to}
 
 };
-use crate::{COOLDOWN, CustomError, FREE_TOKENS_PER_EPOCH, FreeMintTracker,HxuiFreeMintCounter};
+use crate::{  CustomError, FreeMintTracker, HxuiConfig, HxuiFreeMintCounter};
 #[derive(Accounts)]
 
 pub struct MintFreeTokens<'info>{
     pub owner:SystemAccount<'info>,
 
     pub lite_authority:Signer<'info>,
+   
+    #[account(
+        seeds = [b"hxui_config"],
+        bump = hxui_config.bump,
+    )]
+    pub hxui_config: Account<'info,HxuiConfig>,
     
      #[account(
         mut,
@@ -40,37 +46,38 @@ pub struct MintFreeTokens<'info>{
     #[account(
         mut,
         seeds = [b"hxui_free_tokens_counter"],
-        bump = free_tokens_counter.bump,
+        bump = hxui_free_tokens_counter.bump,
     )]
-    pub free_tokens_counter:Account<'info,HxuiFreeMintCounter>,
+    pub hxui_free_tokens_counter:Account<'info,HxuiFreeMintCounter>,
     pub associated_token_program:Program<'info,AssociatedToken>,
     pub token_program:Program<'info,Token2022>
 }
 
-pub fn mint_tokens_for_free(ctx:Context<MintFreeTokens>,amount:u64)->Result<()>{
+pub fn process_mint_free_tokens(ctx:Context<MintFreeTokens>)->Result<()>{
     let clock = Clock::get()?;
     let current_epoch = clock.epoch;
     let current_unix_timestamp = clock.unix_timestamp;
 
-    let hxui_lite_free_mints_counter = &mut ctx.accounts.free_tokens_counter;
-    let is_new_epoch = current_epoch != hxui_lite_free_mints_counter.current_epoch;
-    require!(is_new_epoch || hxui_lite_free_mints_counter.remaining_free_mints > 0,CustomError::AllFreeTokensForTheDayMinted);
+    let hxui_free_mints_counter = &mut ctx.accounts.hxui_free_tokens_counter;
+    let is_new_epoch = current_epoch != hxui_free_mints_counter.current_epoch;
+    require!(is_new_epoch || hxui_free_mints_counter.remaining_free_mints > 0,CustomError::AllFreeTokensForTheDayMinted);
     
+    let hxui_config  = &mut ctx.accounts.hxui_config;
     if is_new_epoch {
-        hxui_lite_free_mints_counter.current_epoch =  current_epoch;
-        hxui_lite_free_mints_counter.remaining_free_mints = FREE_TOKENS_PER_EPOCH;
+        hxui_free_mints_counter.current_epoch =  current_epoch;
+        hxui_free_mints_counter.remaining_free_mints = hxui_config.free_mints_per_epoch;
     }
     let free_mint_tracker = &mut ctx.accounts.free_mint_tracker;
     require!(!free_mint_tracker.unregistered,CustomError::UnregisteredForFreeTokens);
     require!(current_unix_timestamp >= free_mint_tracker.next_mint_timestamp,CustomError::MintCooldownActive);
 
-    free_mint_tracker.next_mint_timestamp = current_unix_timestamp + COOLDOWN;
+    free_mint_tracker.next_mint_timestamp = current_unix_timestamp + hxui_config.free_mint_cool_down;
     let cpi_context = CpiContext::new(ctx.accounts.token_program.to_account_info(),MintTo{
         mint:ctx.accounts.hxui_lite_mint.to_account_info(),
         to:ctx.accounts.hxui_lite_token_account.to_account_info(),
         authority:ctx.accounts.lite_authority.to_account_info()
     });
 
-    hxui_lite_free_mints_counter.remaining_free_mints -= amount;
-    mint_to(cpi_context,amount)
+    hxui_free_mints_counter.remaining_free_mints -= hxui_config.free_tokens_per_mint;
+    mint_to(cpi_context,hxui_config.free_tokens_per_mint)
 }

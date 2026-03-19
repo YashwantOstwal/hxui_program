@@ -23,23 +23,23 @@ pub struct CloseCandidate<'info> {
 }
 
 pub fn process_close_candidate(ctx: Context<CloseCandidate>) -> Result<()> {
-    let candidate: &mut Account<'_, HxuiCandidate> = &mut ctx.accounts.hxui_candidate;
+    let hxui_candidate: &mut Account<'_, HxuiCandidate> = &mut ctx.accounts.hxui_candidate;
 
-    if candidate.status == CandidateStatus::Active {
+    if hxui_candidate.status == CandidateStatus::Active {
         return err!(CustomError::ActiveCandidateCannotBeClosed)
     }
 
-    let is_withdrawn = candidate.status == CandidateStatus::Withdrawn;
-    let is_claimable_winner = candidate.status == CandidateStatus::ClaimableWinner;
+    let is_withdrawn = hxui_candidate.status == CandidateStatus::Withdrawn;
+    let is_claimable_winner = hxui_candidate.status == CandidateStatus::ClaimableWinner;
 
-    // A withdrawn candidate and a claimable winner candidate need not a withdraw window if receipts is 0.
-    if (is_withdrawn || is_claimable_winner) && candidate.receipt_count != 0 {
-        require!(candidate.claim_deadline != 0, CustomError::OpenWithdrawWindowFirst);
+    // A withdrawn hxui_candidate and a claimable winner hxui_candidate need not a withdraw window if receipts is 0.
+    if (is_withdrawn || is_claimable_winner) && hxui_candidate.receipt_count != 0 {
+        require!(hxui_candidate.claim_deadline != 0, CustomError::OpenWithdrawWindowFirst);
 
         let clock = Clock::get()?;
-        require!(clock.unix_timestamp > candidate.claim_deadline, CustomError::WaitUntilWithdrawWindowIsClosed);
+        require!(clock.unix_timestamp > hxui_candidate.claim_deadline, CustomError::WaitUntilWithdrawWindowIsClosed);
     }
-    require!(candidate.receipt_count == 0, CustomError::CloseAllReceiptAccount);
+    require!(hxui_candidate.receipt_count == 0, CustomError::CloseAllReceiptAccount);
 
     Ok(())
 }

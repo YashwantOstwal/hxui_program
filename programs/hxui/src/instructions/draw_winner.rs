@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::{HxuiCandidate, CandidateStatus, HxuiConfig, CustomError, HxuiDropTime};
 #[derive(Accounts)]
-pub struct PickWinner<'info>{
+pub struct DrawWinner<'info>{
 
     #[account(
         seeds = [b"hxui_config"],
@@ -18,15 +18,15 @@ pub struct PickWinner<'info>{
     pub hxui_drop_time: Account<'info,HxuiDropTime>
 }
 
-pub fn pick_winner<'info>(ctx:Context<'_, '_, 'info, 'info,PickWinner<'_>>)->Result<()>{
+pub fn process_draw_winner<'info>(ctx:Context<'_, '_, 'info, 'info,DrawWinner<'_>>)->Result<()>{
     let clock = Clock::get()?;
 
 
-    let poll = &mut ctx.accounts.hxui_drop_time;
-    require!(clock.unix_timestamp > poll.drop_timestamp,CustomError::DrawTimeNotReached);
-    require!(!poll.is_winner_drawn,CustomError::WinnerForCurrentPollAlreadyDrawn);
+    let hxui_drop_time = &mut ctx.accounts.hxui_drop_time;
+    require!(clock.unix_timestamp > hxui_drop_time.drop_timestamp,CustomError::DrawTimeNotReached);
+    require!(!hxui_drop_time.is_winner_drawn,CustomError::WinnerForCurrentPollAlreadyDrawn);
 
-    let mut missing_candidates = poll.active_candidate_ids.clone();
+    let mut missing_candidates = hxui_drop_time.active_candidate_ids.clone();
     let mut candidates= Vec::new();
     
     
@@ -66,9 +66,9 @@ pub fn pick_winner<'info>(ctx:Context<'_, '_, 'info, 'info,PickWinner<'_>>)->Res
     }
     candidates[winner_index].exit(ctx.program_id)?;
     
-    if let Some(index) = poll.active_candidate_ids.iter().position(|&x| x == candidates[winner_index].id){
-        poll.active_candidate_ids.remove(index);
+    if let Some(index) = hxui_drop_time.active_candidate_ids.iter().position(|&x| x == candidates[winner_index].id){
+        hxui_drop_time.active_candidate_ids.remove(index);
     }
-    poll.is_winner_drawn = true;
+    hxui_drop_time.is_winner_drawn = true;
     Ok(())
 }
