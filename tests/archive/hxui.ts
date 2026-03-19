@@ -73,7 +73,7 @@ const [hxuiConfigAddress, hxuiConfigBump] = PublicKey.findProgramAddressSync(
 
 const [hxuiFreeTokensCounterAddress, hxuiFreeTokensCounterBump] =
   PublicKey.findProgramAddressSync(
-    [Buffer.from("hxui_free_tokens_counter")],
+    [Buffer.from("hxui_free_mint_counter")],
     program.programId,
   );
 

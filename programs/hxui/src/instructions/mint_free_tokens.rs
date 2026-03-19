@@ -45,10 +45,10 @@ pub struct MintFreeTokens<'info>{
 
     #[account(
         mut,
-        seeds = [b"hxui_free_tokens_counter"],
-        bump = hxui_free_tokens_counter.bump,
+        seeds = [b"hxui_free_mint_counter"],
+        bump = hxui_free_mint_counter.bump,
     )]
-    pub hxui_free_tokens_counter:Account<'info,HxuiFreeMintCounter>,
+    pub hxui_free_mint_counter:Account<'info,HxuiFreeMintCounter>,
     pub associated_token_program:Program<'info,AssociatedToken>,
     pub token_program:Program<'info,Token2022>
 }
@@ -58,7 +58,7 @@ pub fn process_mint_free_tokens(ctx:Context<MintFreeTokens>)->Result<()>{
     let current_epoch = clock.epoch;
     let current_unix_timestamp = clock.unix_timestamp;
 
-    let hxui_free_mints_counter = &mut ctx.accounts.hxui_free_tokens_counter;
+    let hxui_free_mints_counter = &mut ctx.accounts.hxui_free_mint_counter;
     let is_new_epoch = current_epoch != hxui_free_mints_counter.current_epoch;
     require!(is_new_epoch || hxui_free_mints_counter.remaining_free_mints > 0,CustomError::AllFreeTokensForTheDayMinted);
     

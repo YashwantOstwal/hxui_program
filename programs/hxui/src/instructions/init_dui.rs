@@ -53,7 +53,7 @@ pub struct InitDui<'info>{
     #[account(
         init,
         payer = admin,
-        seeds = [b"hxui_free_tokens_counter"],
+        seeds = [b"hxui_free_mint_counter"],
         bump,
         space = ANCHOR_DISCRIMINATOR + HxuiFreeMintCounter::INIT_SPACE
     )]

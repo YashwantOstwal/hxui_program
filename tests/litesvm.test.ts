@@ -61,7 +61,7 @@ const SEEDS: Record<string, string> = {
   hxuiConfig: "hxui_config",
   hxuiLiteMint: "hxui_lite_mint",
   hxuiPoll: "hxui_drop_time",
-  hxuiFreeTokensCounter: "hxui_free_tokens_counter",
+  hxuiFreeTokensCounter: "hxui_free_mint_counter",
 } as const;
 
 export function getPda(of: keyof typeof SEEDS) {
