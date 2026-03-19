@@ -42,12 +42,12 @@ pub fn draw_winner<'info>(ctx:Context<'_, '_, 'info, 'info,DrawWinner<'_>>)->Res
         instructions::register_for_free_mint::process_register_for_free_mint(ctx)
     }  
 
-    pub fn unregister_for_free_tokens(ctx:Context<DeregisterForFreeMint>)->Result<()>{
-        instructions::deregister_for_free_mint::process_deregister_for_free_mint(ctx)
+    pub fn unregister_for_free_tokens(ctx:Context<DeregisterFromFreeMint>)->Result<()>{
+        instructions::deregister_from_free_mint::process_deregister_from_free_mint(ctx)
     }
 
-pub fn cancel_unregister_for_free_tokens(ctx: Context<CancelDeregisterForFreeMint>) -> Result<()> {
-    instructions::cancel_deregister_for_free_mint::process_cancel_deregister_for_free_mint(ctx)
+pub fn cancel_unregister_for_free_tokens(ctx: Context<CancelDeregisterFromFreeMint>) -> Result<()> {
+    instructions::cancel_deregister_from_free_mint::process_cancel_deregister_from_free_mint(ctx)
 }
 
 pub fn claim_registration_fees(ctx: Context<ClaimRegistrationDeposit>) -> Result<()> {

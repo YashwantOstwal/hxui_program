@@ -25,11 +25,11 @@ pub use withdraw_vault_funds::*;
 pub mod vote_with_hxui;
 pub use vote_with_hxui::*;
 
-pub mod deregister_for_free_mint;
-pub use deregister_for_free_mint::*;
+pub mod deregister_from_free_mint;
+pub use deregister_from_free_mint::*;
 
-pub mod cancel_deregister_for_free_mint;
-pub use cancel_deregister_for_free_mint::*;
+pub mod cancel_deregister_from_free_mint;
+pub use cancel_deregister_from_free_mint::*;
 
 pub mod claim_registration_deposit;
 pub use claim_registration_deposit::*;
