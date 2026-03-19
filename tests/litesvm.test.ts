@@ -25,9 +25,6 @@ import {
 } from "litesvm";
 import IDL from "../target/idl/hxui.json" with { type: "json" };
 
-// const FREE_TOKENS_MINT_AMOUNT = 1;
-// const FREE_TOKENS_PER_EPOCH = 100;
-const COOLDOWN = 43200;
 const svm = new LiteSVM();
 const programId = new PublicKey(IDL.address);
 const payer = new Keypair();
@@ -357,7 +354,7 @@ describe("2) HxuiDropTime creation testing", () => {
     });
 
     const failed = sendTransaction([ix]);
-    assertTxFailedWithErrorCode(failed, "PollIsLive");
+    assertTxFailedWithErrorCode(failed, "DrawTimeNotReached");
   });
 
   it("2.3) Cannot create a new poll before the poll ends", () => {
@@ -368,7 +365,7 @@ describe("2) HxuiDropTime creation testing", () => {
     const failed = sendTransaction([ix], [admin]);
 
     if (failed instanceof FailedTransactionMetadata) {
-      assert(failed.meta().logs()[2].search("PollIsLive.") != -1);
+      assert(failed.meta().logs()[2].search("DrawTimeNotReached.") != -1);
     } else {
       assert(false);
     }
@@ -419,7 +416,7 @@ describe("2) HxuiDropTime creation testing", () => {
     svm.expireBlockhash();
 
     if (failed instanceof FailedTransactionMetadata) {
-      assert(failed.meta().logs()[2].search("WinnerNotDrawn.") != -1);
+      assert(failed.meta().logs()[2].search("PendingWinnerDraw.") != -1);
     } else {
       assert(false);
     }
@@ -533,11 +530,11 @@ describe("4) Testing 4", () => {
       "FreeMintTracker",
       Buffer.from(mintedTimestampAccount.data),
     );
-
+    configAccount.free_mint_cool_down.toNumber();
     const now = svm.getClock().unixTimestamp;
     assert(
       mintedTimestampAccountData.next_mint_timestamp.eq(
-        new anchor.BN(now + BigInt(43200)),
+        new anchor.BN(now).add(configAccount.free_mint_cool_down),
         "lorem",
       ),
     );
@@ -554,7 +551,7 @@ describe("4) Testing 4", () => {
     const failed = sendTransaction([ix], [liteAuthority]);
 
     if (failed instanceof FailedTransactionMetadata) {
-      assert(failed.meta().logs()[2].search("RateLimitExceeded.") != -1);
+      assert(failed.meta().logs()[2].search("MintCooldownActive.") != -1);
     } else {
       assert(false);
     }
@@ -580,10 +577,11 @@ describe("4) Testing 4", () => {
       Buffer.from(mintedTimestampAccount.data),
     );
 
+    const configAccount = getConfigAccount();
     const now = svm.getClock().unixTimestamp;
     assert(
       mintedTimestampAccountData.next_mint_timestamp.eq(
-        new anchor.BN(now + BigInt(43200)),
+        new anchor.BN(now).add(configAccount.free_mint_cool_down),
       ),
     );
 
@@ -649,7 +647,10 @@ describe("4) Testing 4", () => {
   });
   it("4.11) Mint free tokens to admin token account after cooldown", () => {
     const now = svm.getClock();
-    now.unixTimestamp = now.unixTimestamp + BigInt(43200);
+
+    const configAccount = getConfigAccount();
+    now.unixTimestamp =
+      now.unixTimestamp + BigInt(configAccount.free_mint_cool_down.toNumber());
     svm.setClock(now); // time travelling ahead to the time where the admin can mint new tokens.
     const ix = getMintFreeTokensInstruction({ to: adminPubkey });
 
@@ -659,7 +660,6 @@ describe("4) Testing 4", () => {
 
     const tokenStateAfter = getHxuiLiteAccount(adminPubkey);
     const freeTokensCounterDataAfter = getFreeTokensCounterAccount();
-    const configAccount = getConfigAccount();
     assert.equal(
       tokenStateAfter.amount - tokenStateBefore.amount,
       BigInt(configAccount.free_tokens_per_mint),
@@ -680,7 +680,7 @@ describe("4) Testing 4", () => {
 
     assert(
       mintedTimestampAccountData.next_mint_timestamp.eq(
-        new anchor.BN(now.unixTimestamp + BigInt(43200)),
+        new anchor.BN(now.unixTimestamp).add(configAccount.free_mint_cool_down),
       ),
     );
     assert(!mintedTimestampAccountData.unregistered);
@@ -688,7 +688,10 @@ describe("4) Testing 4", () => {
 
   it("4.12) Unregister after cooldown allows to claim registration fees immediately", async () => {
     const now = svm.getClock();
-    now.unixTimestamp = now.unixTimestamp + BigInt(43200);
+
+    const configAccount = getConfigAccount();
+    now.unixTimestamp =
+      now.unixTimestamp + BigInt(configAccount.free_mint_cool_down.toNumber());
     svm.setClock(now);
     const unregisterIx = getUnregisterForFreeTokensInstruction({
       for: adminPubkey,
@@ -955,19 +958,29 @@ describe("5) HxuiCandidate creation, Voting candiate, Picking winner, Active Hxu
     }
     sendTransaction(ixs, [liteAuthority, ...users]);
 
+    const configAccount = getConfigAccount();
     for (let i = 0; i < users.length; i++) {
       const hxuiLiteTokenAccount = getHxuiLiteAccount(users[i].publicKey);
       assert(
         hxuiLiteTokenAccount.mint.equals(getPda(SEEDS.hxuiLiteMint).address),
       );
       assert(hxuiLiteTokenAccount.owner.equals(users[i].publicKey));
-      assert.equal(hxuiLiteTokenAccount.amount, BigInt(1));
+
+      assert.equal(
+        new anchor.BN(hxuiLiteTokenAccount.amount).eq(
+          configAccount.free_tokens_per_mint,
+        ),
+        BigInt(1),
+      );
     }
 
     //Minting free tokens for users[0] for testing.
+
     for (let i = 0; i < 24; i++) {
       const clock = svm.getClock();
-      clock.unixTimestamp = clock.unixTimestamp + BigInt(COOLDOWN);
+      clock.unixTimestamp =
+        clock.unixTimestamp +
+        BigInt(configAccount.free_mint_cool_down.toNumber());
       svm.setClock(clock);
       const ixs = [];
       for (let i = 0; i < users.length - 1; i++) {

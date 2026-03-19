@@ -62,7 +62,7 @@ pub fn mint_tokens_for_free(ctx:Context<MintFreeTokens>,amount:u64)->Result<()>{
     }
     let free_mint_tracker = &mut ctx.accounts.free_mint_tracker;
     require!(!free_mint_tracker.unregistered,CustomError::UnregisteredForFreeTokens);
-    require!(current_unix_timestamp >= free_mint_tracker.next_mint_timestamp,CustomError::RateLimitExceeded);
+    require!(current_unix_timestamp >= free_mint_tracker.next_mint_timestamp,CustomError::MintCooldownActive);
 
     free_mint_tracker.next_mint_timestamp = current_unix_timestamp + COOLDOWN;
     let cpi_context = CpiContext::new(ctx.accounts.token_program.to_account_info(),MintTo{

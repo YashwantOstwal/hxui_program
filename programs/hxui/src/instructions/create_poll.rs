@@ -27,10 +27,10 @@ pub fn create_new_poll(ctx:Context<CreatePoll>,new_deadline:i64)->Result<()>{
     let poll = &mut ctx.accounts.hxui_drop_time;
     let clock: Clock = Clock::get()?;
     if poll.drop_timestamp!=0 {
-        require!(clock.unix_timestamp > poll.drop_timestamp,CustomError::PollIsLive);
-        require!(poll.is_winner_drawn,CustomError::WinnerNotDrawn);
+        require!(clock.unix_timestamp > poll.drop_timestamp,CustomError::DrawTimeNotReached);
+        require!(poll.is_winner_drawn,CustomError::PendingWinnerDraw);
     }
-    require!(new_deadline > clock.unix_timestamp,CustomError::InvalidDeadline);
+    require!(new_deadline > clock.unix_timestamp,CustomError::InvalidDropTime);
         poll.drop_timestamp = new_deadline;
         poll.is_winner_drawn = false;
     Ok(())

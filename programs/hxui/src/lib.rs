@@ -55,13 +55,13 @@ pub fn draw_winner<'info>(ctx:Context<'_, '_, 'info, 'info,PickWinner<'_>>)->Res
         instructions::unregister_for_free_tokens::set_close_time(ctx)
     }
 
-    pub fn cancel_unregister_for_free_tokens(ctx:Context<CancelUnRegisterForFreeTokens>)->Result<()>{
-        instructions::cancel_unregister_for_free_tokens::reset_close_time(ctx)
-    }
+pub fn cancel_unregister_for_free_tokens(ctx: Context<CancelDeregister>) -> Result<()> {
+    instructions::cancel_deregister::process_cancel_deregister(ctx)
+}
 
-      pub fn claim_registration_fees(ctx:Context<ClaimRegistration>)->Result<()>{
-        instructions::claim_registration::close_last_minted_timestamp(ctx)
-    }
+pub fn claim_registration_fees(ctx: Context<ClaimRegistrationDeposit>) -> Result<()> {
+    instructions::claim_registration_deposit::process_claim_registration_deposit(ctx)
+}
 
     pub fn mint_free_tokens(ctx:Context<MintFreeTokens>)->Result<()>{
         instructions::mint_free_tokens::mint_tokens_for_free(ctx,1)
@@ -72,17 +72,16 @@ pub fn draw_winner<'info>(ctx:Context<'_, '_, 'info, 'info,PickWinner<'_>>)->Res
         instructions::create_candidate::initialise_candidate(ctx,name,description,
         claim_back_offer)
     }
-    pub fn close_candidate(ctx:Context<CloseCandidate>,_name:String)->Result<()>{
-        instructions::close_candidate::close_candidate_account(ctx)
-    }
+pub fn close_candidate(ctx: Context<CloseCandidate>, _name: String) -> Result<()> {
+    instructions::close_candidate::process_close_candidate(ctx)
+}
     pub fn open_claimable_window(ctx:Context<OpenClaimableWindow>,_name:String,until:i64)->Result<()>{
         instructions::open_claimable_window::set_closable_time(ctx,until)
     }
    
 
-     pub fn buy_paid_tokens(ctx:Context<BuyPaidTokens>,amount:u64)->Result<()>{
-        instructions::buy_paid_tokens::payment(&ctx,&amount)?;
-        instructions::buy_paid_tokens::mint_tokens(ctx,amount)
+     pub fn buy_paid_tokens(ctx:Context<BuyTokens>,amount:u64)->Result<()>{
+        instructions::buy_tokens::process_buy_tokens(ctx,amount)
     }
 
     pub fn safe_withdraw_from_vault(ctx:Context<SafeWithdrawFromVault>,amount:Option<u64>)->Result<()>{
@@ -100,13 +99,14 @@ pub fn draw_winner<'info>(ctx:Context<'_, '_, 'info, 'info,PickWinner<'_>>)->Res
         instructions::withdraw_candidate::stop_candidate(ctx)
     }
     
-    pub fn claim_tokens(ctx:Context<ClaimTokens>,_name:String)->Result<()>{
-        instructions::claim_tokens::claim_back_tokens(ctx)
-    }
+pub fn claim_tokens(ctx: Context<ClaimBackTokens>, _name: String) -> Result<()> {
+    instructions::claim_back_tokens::process_claim_back_tokens(ctx)
+}
 
-    pub fn clear_receipt(ctx:Context<ClearReceipt>,_name:String)->Result<()>{
-        instructions::clear_receipt::close_receipt_account(ctx)
-    }
+
+pub fn clear_receipt(ctx: Context<CloseVoteReceipt>, _name: String) -> Result<()> {
+    instructions::close_vote_receipt::process_close_vote_receipt(ctx)
+}
 
     pub fn set_claim_back_offer(ctx:Context<SetClaimBackOffer>,_name:String)->Result<()>{
         instructions::set_claim_back_offer::set_claimable_if_winner(ctx)

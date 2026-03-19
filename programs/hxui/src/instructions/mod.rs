@@ -16,8 +16,8 @@ pub use mint_free_tokens::*;
 pub mod create_candidate;
 pub use create_candidate::*;
 
-pub mod buy_paid_tokens;
-pub use buy_paid_tokens::*;
+pub mod buy_tokens;
+pub use buy_tokens::*;
 
 pub mod safe_withdraw_from_vault;
 pub use safe_withdraw_from_vault::*;
@@ -28,11 +28,11 @@ pub use vote_candidate::*;
 pub mod unregister_for_free_tokens;
 pub use unregister_for_free_tokens::*;
 
-pub mod cancel_unregister_for_free_tokens;
-pub use cancel_unregister_for_free_tokens::*;
+pub mod cancel_deregister;
+pub use cancel_deregister::*;
 
-pub mod claim_registration;
-pub use claim_registration::*;
+pub mod claim_registration_deposit;
+pub use claim_registration_deposit::*;
 
 pub mod vote_candidate_with_hxui_lite;
 pub use vote_candidate_with_hxui_lite::*;
@@ -46,11 +46,11 @@ pub use close_candidate::*;
 pub mod open_claimable_window;
 pub use open_claimable_window::*;
 
-pub mod claim_tokens;
-pub use claim_tokens::*;
+pub mod claim_back_tokens;
+pub use claim_back_tokens::*;
 
-pub mod clear_receipt;
-pub use clear_receipt::*;
+pub mod close_vote_receipt;
+pub use close_vote_receipt::*;
 
 
 pub mod set_claim_back_offer;

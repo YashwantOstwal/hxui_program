@@ -23,7 +23,7 @@ pub fn pick_winner<'info>(ctx:Context<'_, '_, 'info, 'info,PickWinner<'_>>)->Res
 
 
     let poll = &mut ctx.accounts.hxui_drop_time;
-    require!(clock.unix_timestamp > poll.drop_timestamp,CustomError::PollIsLive);
+    require!(clock.unix_timestamp > poll.drop_timestamp,CustomError::DrawTimeNotReached);
     require!(!poll.is_winner_drawn,CustomError::WinnerForCurrentPollAlreadyDrawn);
 
     let mut missing_candidates = poll.active_candidate_ids.clone();

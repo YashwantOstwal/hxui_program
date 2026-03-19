@@ -2,22 +2,24 @@ use anchor_lang::prelude::*;
 
 #[error_code]
 pub enum CustomError {
-    #[msg("The deadline must be in future")]
-    InvalidDeadline,
+    #[msg("The drop time must be set in the future.")]
+    InvalidDropTime,
 
-    #[msg("Cannot pick winner before the poll is ended")]
-    PollIsLive,
+    #[msg("A winner can only be drawn after the scheduled draw time has passed.")]
+    DrawTimeNotReached,
 
-    #[msg("Winner is not drawn for the current poll")]
-    WinnerNotDrawn,
+    #[msg("Draw winner for current cycle before setting a new drop time.")]
+    PendingWinnerDraw,
 
-    #[msg("Only one token can be minted per 12 hours.")]
-    RateLimitExceeded,
 
-    #[msg("Name must not be greater than 32 characters")]
+    #[msg("Maximum tokens have already been minted. Please try again after the free mint cooldown.")]
+    MintCooldownActive,
+
+
+    #[msg("Candidate name should be less than or equal to 32 characters")]
     NameTooLong,
 
-    #[msg("Description must not be greater than 280 characters")]
+    #[msg("Candidate description should be less than or equal to 32 characters")]
     DescriptionTooLong,
 
     #[msg("Not Enough funds in the vault to afford this transfer.")]
@@ -29,37 +31,37 @@ pub enum CustomError {
     #[msg("Only admin can invoke this instruction")]
     OnlyAdminAccess,
 
-    #[msg("The candidate is already a winner.")]
+    #[msg("This candidate is already a winner.")]
     CandidateAlreadyAWinner,
 
-    #[msg("HxuiCandidate is already withdrawn or is a winner.")]
+    #[msg("Only active candidates can be voted.")]
     CandidateIsNoLongerVotable,
 
-    #[msg("The registration fees can be claimed only after 12 hours of unregistration.")]
+    #[msg("The registration fees can only be claimed free mint cooldown.")]
     UnclaimableYet,
 
-    #[msg("Already unregistered.")]
+    #[msg("User have already unregistered.")]
     AlreadyUnregistered,
 
     #[msg("UnregisteredFreeTokens.")]
     UnregisteredForFreeTokens,
 
-    #[msg("Winner for current poll is already drawn.")]
+    #[msg("Only one winner can be drawn in each cycle. set a new drop time and draw a winer after the drop time.")]
     WinnerForCurrentPollAlreadyDrawn,
 
-    #[msg("Please Unregister first before attempting to claim")]
+    #[msg("Not unregistered")]
     UnregisterFirst,
 
-    #[msg("All 100 free tokens minted for the day.")]
+    #[msg("Rate limit exceeded for maximum free mints per epoch")]
     AllFreeTokensForTheDayMinted,
 
-    #[msg("Atleast one of the candidate is not a candidate.")]
+    #[msg("Received an invalid candidate.")]
     InvalidCandidate,
 
-    #[msg("Not all candidates have been passed.")]
+    #[msg("One or more active candidates are missing.")]
     MissingCandidate,
 
-    #[msg("Pass all the active candidates mentioned in the poll account.")]
+    #[msg("Pass all the active candidates mentioned in the drop time account.")]
     PassAllActiveCandidates,
 
     #[msg("There are no candidates to pick winner from.")]
@@ -68,10 +70,10 @@ pub enum CustomError {
     #[msg("Close all the receipts first otherwise you will lose your money.")]
     CloseAllReceiptAccount,
 
-    #[msg("Cannot close active componenet or their receipts. Withdraw or wait until it becomes a winner")]
+    #[msg("Cannot close Non active candidate.")]
     ActiveCandidateCannotBeClosed,
 
-    #[msg("The component is either claimable or withdrawn")]
+    #[msg("The component is either claimable or withdrawn. Considering opening withdraw window first")]
     OpenWithdrawWindowFirst,
 
     #[msg("This component can be closed immediately by clearing all the receipts.")]
@@ -80,7 +82,7 @@ pub enum CustomError {
         #[msg("This component can be closed immediately without the withdraw window as there are 0 receipts.")]
     CanBeClosedImmediatelyWithoutWithdrawWindow,
 
-    #[msg("Tokens cannot be claimed while the candidate is active or is unclaimable winner.")]
+    #[msg("Tokens cannot be claimed while the candidate is active or is a winner without claim back offer..")]
     TokensCannotBeClaimed,
 
     #[msg("Close time should be greater than the current time.")]
@@ -118,3 +120,120 @@ pub enum CustomError {
     NotEnoughVotesForWinner
 
 }
+
+
+// use anchor_lang::prelude::*;
+
+// #[error_code]
+// pub enum CustomError {
+//     #[msg("The drop time must be set in the future.")]
+//     InvalidDropTime,
+
+//     #[msg("A winner can only be drawn after the scheduled draw time has passed.")]
+//     DrawTimeNotReached,
+
+//     #[msg("You must draw a winner for the current cycle before setting a new drop time.")]
+//     PendingWinnerDraw,
+
+//     #[msg("Maximum tokens have already been minted. Please try again after the free mint cooldown.")]
+//     MintCooldownActive,
+
+//     #[msg("The candidate's name exceeds the maximum length of 32 characters.")]
+//     CandidateNameTooLong,
+
+//     #[msg("The candidate's description exceeds the maximum length of 32 characters.")]
+//     CandidateDescriptionTooLong,
+
+//     #[msg("The vault has insufficient funds to complete this transfer.")]
+//     VaultInsufficientFunds,
+
+//     #[msg("The specified token price is economically invalid.")]
+//     InvalidTokenPrice,
+
+//     #[msg("Unauthorized: Only an administrator can invoke this instruction.")]
+//     UnauthorizedAdminAccess,
+
+//     #[msg("This candidate has already been selected as a winner.")]
+//     DuplicateWinner,
+
+//     #[msg("Votes can only be cast for active candidates.")]
+//     InactiveCandidateVoted,
+
+//     #[msg("Registration fees can only be claimed after the free mint cooldown period.")]
+//     FeeClaimCooldownActive,
+
+//     #[msg("This user has already unregistered.")]
+//     UserAlreadyUnregistered,
+
+//     #[msg("The user is not registered for free tokens.")]
+//     NotRegisteredForFreeTokens,
+
+//     #[msg("A winner for the current cycle has already been drawn. Set a new drop time first.")]
+//     CycleWinnerAlreadyDrawn,
+
+//     #[msg("You must unregister before performing this action.")]
+//     MustUnregisterFirst,
+
+//     #[msg("The daily rate limit for free mints has been exceeded.")]
+//     DailyFreeMintLimitExceeded,
+
+//     #[msg("The provided candidate is invalid or does not exist.")]
+//     InvalidCandidate,
+
+//     #[msg("One or more required active candidates are missing from the input.")]
+//     ActiveCandidatesMissing,
+
+//     #[msg("You must provide all active candidates listed in the drop time account.")]
+//     IncompleteActiveCandidateList,
+
+//     #[msg("There are currently no valid candidates to choose a winner from.")]
+//     EmptyCandidatePool,
+
+//     #[msg("You must close all receipt accounts first to prevent loss of funds.")]
+//     PendingReceiptsExist,
+
+//     #[msg("An active candidate cannot be closed.")]
+//     CannotCloseActiveCandidate,
+
+//     #[msg("The withdrawal window must be opened before claiming or withdrawing.")]
+//     WithdrawWindowNotOpen,
+
+//     #[msg("Clear all receipts to immediately close this component.")]
+//     RequiresReceiptClearance,
+
+//     #[msg("This component has zero receipts and can be closed immediately without a withdrawal window.")]
+//     ZeroReceiptsImmediateClose,
+
+//     #[msg("Tokens cannot be claimed while the candidate is active or has won without a claim-back offer.")]
+//     IneligibleForTokenClaim,
+
+//     #[msg("The close time must be set to a future timestamp.")]
+//     CloseTimeNotInFuture,
+
+//     #[msg("The provided receipt does not match the specified candidate.")]
+//     ReceiptCandidateMismatch,
+
+//     #[msg("Withdrawals are only permitted for active candidates.")]
+//     InactiveCandidateWithdrawal,
+
+//     #[msg("Receipt accounts cannot be closed while the candidate is still active.")]
+//     CannotCloseActiveReceipts,
+
+//     #[msg("The vote amount must be greater than zero.")]
+//     ZeroVotesProvided,
+
+//     #[msg("Tokens cannot be claimed at this time. The withdrawal window is either closed or has not yet opened.")]
+//     OutsideWithdrawalWindow,
+
+//     #[msg("You must wait until the current withdrawal window has closed.")]
+//     WithdrawalWindowStillOpen,
+
+//     #[msg("An active candidate is not permitted to open a withdrawal window.")]
+//     ActiveCandidateWithdrawalBlocked,
+
+//     #[msg("Claimable status cannot be set for a non-active candidate.")]
+//     InactiveCandidateClaimBlocked,
+
+//     #[msg("A candidate must have at least 10 votes to be eligible to win.")]
+//     InsufficientVotesForWinner,
+// }

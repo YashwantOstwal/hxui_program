@@ -281,7 +281,7 @@ describe("2) HxuiDropTime creation testing", () => {
         errorCode: { code },
       },
     }) {
-      assert.equal(code, "PollIsLive");
+      assert.equal(code, "DrawTimeNotReached");
     }
   });
   it("2.3) Cannot create a new poll before the poll ends", async () => {
@@ -301,7 +301,7 @@ describe("2) HxuiDropTime creation testing", () => {
         errorCode: { code },
       },
     }) {
-      assert.equal(code, "PollIsLive");
+      assert.equal(code, "DrawTimeNotReached");
     }
   });
 
@@ -329,7 +329,7 @@ describe("2) HxuiDropTime creation testing", () => {
         errorCode: { code },
       },
     }) {
-      assert.equal(code, "WinnerNotDrawn");
+      assert.equal(code, "PendingWinnerDraw");
     }
   });
   // it("2.6) Winner for current poll is drawn", async () => {
@@ -363,7 +363,7 @@ describe("2) HxuiDropTime creation testing", () => {
   //       errorCode: { code },
   //     },
   //   }) {
-  //     assert.equal(code, "InvalidDeadline");
+  //     assert.equal(code, "InvalidDropTime");
   //   }
   // });
 
@@ -549,7 +549,7 @@ describe("2) HxuiDropTime creation testing", () => {
 //         errorCode: { code },
 //       },
 //     }) {
-//       assert.equal(code, "RateLimitExceeded");
+//       assert.equal(code, "MintCooldownActive");
 //     }
 //   });
 
