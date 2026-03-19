@@ -4,7 +4,7 @@ use anchor_spl::{
     associated_token::AssociatedToken,
     token_interface::{Mint,TokenAccount,Token2022,Burn,burn},
 };
-use crate::{Candidate, CandidateStatus, Config, CustomError};
+use crate::{HxuiCandidate, CandidateStatus, HxuiConfig, CustomError};
 #[derive(Accounts)]
 #[instruction(name:String)]
 pub struct VoteCandidateWithHxuiLite<'info>{
@@ -34,16 +34,16 @@ pub struct VoteCandidateWithHxuiLite<'info>{
         // constraint = hxui_candidate.can_be_winner == true @ CustomError::CandidateIsNoLongerVotable
         // constraint = hxui_candidate.is_winner == false @ CustomError::CandidateAlreadyAWinner,
 
-        constraint = hxui_candidate.candidate_status == CandidateStatus::Active @ CustomError::OnlyActiveCandidateCanBeVoted,
+        constraint = hxui_candidate.status == CandidateStatus::Active @ CustomError::OnlyActiveCandidateCanBeVoted,
     )]
-    pub hxui_candidate:Account<'info,Candidate>,
+    pub hxui_candidate:Account<'info,HxuiCandidate>,
 
 
     #[account(
         seeds = [b"hxui_config"],
         bump = hxui_config.bump,
     )]
-    pub hxui_config: Account<'info,Config>,
+    pub hxui_config: Account<'info,HxuiConfig>,
 
     pub system_program:Program<'info,System>,
     pub associated_token_program:Program<'info,AssociatedToken>,
@@ -55,7 +55,7 @@ pub fn vote_with_hxui_lite(ctx:Context<VoteCandidateWithHxuiLite>,votes:u64)->Re
     let config = & ctx.accounts.hxui_config;
 
     let tokens_spent = votes * config.tokens_per_vote;
-    candidate.number_of_votes += votes;
+    candidate.vote_count += votes;
     let cpi_context = CpiContext::new(ctx.accounts.token_program.to_account_info(),Burn{
         mint:ctx.accounts.hxui_lite_mint.to_account_info(),
         from:ctx.accounts.hxui_lite_token_account.to_account_info(),

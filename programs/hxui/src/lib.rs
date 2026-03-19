@@ -16,16 +16,23 @@ pub mod hxui {
 
     use super::*;
 
-    pub fn initialise_dapp(ctx:Context<InitialiseDapp>,price_per_token:u64,tokens_per_vote:u64)->Result<()>{
+    pub fn initialise_dapp(ctx:Context<InitialiseDapp>,price_per_token:u64,tokens_per_vote:u64,
+         free_tokens_per_mint:u64,
+     free_mints_per_epoch:u64,
+     free_mint_cool_down:u64,)->Result<()>{
         let config_bump: u8  = ctx.bumps.hxui_config;
         let admin_pubkey: Pubkey = ctx.accounts.admin.key();
         instructions::initialise_dapp::initialise_config(
             ctx,
-            Config { 
+            HxuiConfig { 
                 admin:admin_pubkey,
                 price_per_token,
                 tokens_per_vote,
-                bump:config_bump
+                bump:config_bump,
+free_tokens_per_mint,
+     free_mints_per_epoch,
+     free_mint_cool_down,
+
             },
         )
 
@@ -41,7 +48,7 @@ pub fn draw_winner<'info>(ctx:Context<'_, '_, 'info, 'info,PickWinner<'_>>)->Res
     }
 
     pub fn register_for_free_tokens(ctx:Context<RegisterFreeTokens>)->Result<()>{
-        instructions::register_for_free_tokens::initialise_hxui_lite_minted_timestamp(ctx)
+        instructions::register_for_free_tokens::initialise_free_mint_tracker(ctx)
     }  
 
     pub fn unregister_for_free_tokens(ctx:Context<UnregisterFreeTokens>)->Result<()>{
@@ -61,9 +68,9 @@ pub fn draw_winner<'info>(ctx:Context<'_, '_, 'info, 'info,PickWinner<'_>>)->Res
     }
     
     pub fn create_candidate(ctx:Context<CreateCandidate>,name:String,description:String,
-    claimable_if_winner:bool)->Result<()>{
+    claim_back_offer:bool)->Result<()>{
         instructions::create_candidate::initialise_candidate(ctx,name,description,
-        claimable_if_winner)
+        claim_back_offer)
     }
     pub fn close_candidate(ctx:Context<CloseCandidate>,_name:String)->Result<()>{
         instructions::close_candidate::close_candidate_account(ctx)

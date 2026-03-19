@@ -1,21 +1,21 @@
 use anchor_lang::prelude::*;
-use crate::{FreeTokenTimestamp,CustomError};
+use crate::{FreeMintTracker,CustomError};
 #[derive(Accounts)]
 pub struct UnregisterFreeTokens<'info>{
     pub owner:Signer<'info>,
 
     #[account(
         mut,
-        seeds = [b"minted_timestamp",owner.key().as_ref()],
-        bump = hxui_lite_minted_timestamp.bump
+        seeds = [b"free_mint_tracker",owner.key().as_ref()],
+        bump = free_mint_tracker.bump
     )]
-    pub hxui_lite_minted_timestamp:Account<'info,FreeTokenTimestamp>,
+    pub free_mint_tracker:Account<'info,FreeMintTracker>,
 
 }
 
 pub fn set_close_time(ctx:Context<UnregisterFreeTokens>)->Result<()>{
-    let hxui_lite_minted_timestamp = &mut ctx.accounts.hxui_lite_minted_timestamp;
-    require!(hxui_lite_minted_timestamp.closable_timestamp == 0,CustomError::AlreadyUnregistered);
-    hxui_lite_minted_timestamp.closable_timestamp = hxui_lite_minted_timestamp.next_mintable_timestamp;
+    let free_mint_tracker = &mut ctx.accounts.free_mint_tracker;
+    require!(!free_mint_tracker.unregistered,CustomError::AlreadyUnregistered);
+    free_mint_tracker.unregistered = true;
     Ok(())
 }

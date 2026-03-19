@@ -5,7 +5,7 @@ use anchor_spl::{
     associated_token::AssociatedToken,
     token_interface::{Mint,TokenAccount,Token2022,Burn,burn},
 };
-use crate::{Candidate, Config, CustomError,ANCHOR_DISCRIMINATOR,VoteReceipt, CandidateStatus};
+use crate::{HxuiCandidate, HxuiConfig, CustomError,ANCHOR_DISCRIMINATOR,VoteReceipt, CandidateStatus};
 #[derive(Accounts)]
 #[instruction(name:String)]
 pub struct VoteCandidate<'info>{
@@ -33,9 +33,9 @@ pub struct VoteCandidate<'info>{
         mut,
         seeds = [b"hxui_candidate",name.as_bytes()],
         bump = hxui_candidate.bump,
-        constraint = hxui_candidate.candidate_status == CandidateStatus::Active @ CustomError::OnlyActiveCandidateCanBeVoted,
+        constraint = hxui_candidate.status == CandidateStatus::Active @ CustomError::OnlyActiveCandidateCanBeVoted,
     )]
-    pub hxui_candidate:Account<'info,Candidate>,
+    pub hxui_candidate:Account<'info,HxuiCandidate>,
 
     
     /// CHECK: This account can either be VoteReceipt owned by the current program or be uninitialised (owned by System program). 
@@ -58,7 +58,7 @@ pub struct VoteCandidate<'info>{
         seeds = [b"hxui_config"],
         bump = hxui_config.bump,
     )]
-    pub hxui_config: Account<'info,Config>,
+    pub hxui_config: Account<'info,HxuiConfig>,
 
     pub system_program:Program<'info,System>,
     pub associated_token_program:Program<'info,AssociatedToken>,
@@ -82,7 +82,7 @@ pub fn vote(ctx:Context<VoteCandidate>,name:String,votes:u64)->Result<()>{
         vote_receipt_data.try_serialize(&mut &mut data[..])?;
     }
     else {
-        candidate.total_receipts +=1;
+        candidate.receipt_count +=1;
 
         let owner_pubkey = &ctx.accounts.owner.key();
 
@@ -110,7 +110,7 @@ pub fn vote(ctx:Context<VoteCandidate>,name:String,votes:u64)->Result<()>{
         data[..8].copy_from_slice(&discriminator);
         state.serialize(&mut &mut data[8..])?;
     }
-    candidate.number_of_votes += votes;
+    candidate.vote_count += votes;
     let cpi_context = CpiContext::new(ctx.accounts.token_program.to_account_info(),Burn{
         mint:ctx.accounts.hxui_mint.to_account_info(),
         from:ctx.accounts.hxui_token_account.to_account_info(),

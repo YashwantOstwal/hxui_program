@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{Candidate, CandidateStatus, CustomError};
+use crate::{HxuiCandidate, CandidateStatus, CustomError};
 #[derive(Accounts)]
 #[instruction(name:String)]
 pub struct CloseCandidate<'info>{
@@ -13,7 +13,7 @@ pub struct CloseCandidate<'info>{
         bump = hxui_candidate.bump,
 
     )]
-    pub hxui_candidate:Account<'info,Candidate>,
+    pub hxui_candidate:Account<'info,HxuiCandidate>,
 
     #[account(
         mut,
@@ -25,23 +25,23 @@ pub struct CloseCandidate<'info>{
 }
 
 pub fn close_candidate_account(ctx:Context<CloseCandidate>)->Result<()>{
-    let candidate: &mut Account<'_, Candidate> = &mut ctx.accounts.hxui_candidate;
+    let candidate: &mut Account<'_, HxuiCandidate> = &mut ctx.accounts.hxui_candidate;
     
-    if candidate.candidate_status == CandidateStatus::Active {
+    if candidate.status == CandidateStatus::Active {
         return err!(CustomError::ActiveCandidateCannotBeClosed)
     }
 
-    let is_withdrawn = candidate.candidate_status == CandidateStatus::Withdrawn;
-    let is_claimable_winner = candidate.candidate_status == CandidateStatus::ClaimableWinner;
+    let is_withdrawn = candidate.status == CandidateStatus::Withdrawn;
+    let is_claimable_winner = candidate.status == CandidateStatus::ClaimableWinner;
 
     // A withdrawn candidate and a claimable winner candidate need not a withdraw window if receipts is 0.
-    if (is_withdrawn || is_claimable_winner) && candidate.total_receipts!=0 {
-        require!(candidate.claim_window!=0 ,CustomError::OpenWithdrawWindowFirst);
+    if (is_withdrawn || is_claimable_winner) && candidate.receipt_count!=0 {
+        require!(candidate.claim_deadline!=0 ,CustomError::OpenWithdrawWindowFirst);
 
         let clock = Clock::get()?;
-        require!(clock.unix_timestamp > candidate.claim_window,CustomError::WaitUntilWithdrawWindowIsClosed);
+        require!(clock.unix_timestamp > candidate.claim_deadline,CustomError::WaitUntilWithdrawWindowIsClosed);
     }
-    require!(candidate.total_receipts == 0,CustomError::CloseAllReceiptAccount);
+    require!(candidate.receipt_count == 0,CustomError::CloseAllReceiptAccount);
     
     Ok(())
 }

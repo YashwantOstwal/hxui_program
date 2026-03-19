@@ -137,7 +137,7 @@ async function airdropAndAssert(
   assert.equal(userBalanceAfter, userBalanceBefore + lamports);
 }
 const [pollAddress, pollBump] = PublicKey.findProgramAddressSync(
-  [Buffer.from("hxui_poll")],
+  [Buffer.from("hxui_drop_time")],
   program.programId,
 );
 
@@ -241,7 +241,7 @@ describe("1) initialise_dapp instruction testing", () => {
   });
 });
 
-describe("2) Poll creation testing", () => {
+describe("2) HxuiDropTime creation testing", () => {
   it("2.1) Create Genesis poll", async () => {
     const currentBlockTime = await getBlockTime();
     const pollEndsAt = new BN(currentBlockTime + 3); // deadline is 3secs from now.
@@ -262,9 +262,9 @@ describe("2) Poll creation testing", () => {
     assert.equal(adminBalanceBefore - adminBalanceAfter, pollRent);
 
     const pollAccountData = await program.account.poll.fetch(pollAddress);
-    assert(pollAccountData.currentPollDeadline.eq(pollEndsAt));
-    assert.equal(pollAccountData.currentPollWinnerDrawn, false);
-    assert.equal(pollAccountData.totalCandidates, 0);
+    assert(pollAccountData.dropTime.eq(pollEndsAt));
+    assert.equal(pollAccountData.isWinnerDrawn, false);
+    assert.equal(pollAccountData.totalCandidateCount, 0);
     assert.equal(pollAccountData.currentPollCandidates.length, 0);
     assert.equal(pollAccountData.bump, pollBump);
   });
@@ -310,7 +310,7 @@ describe("2) Poll creation testing", () => {
     const pollAccount = await program.account.poll.fetch(pollAddress);
     const currentBlockTime = await getBlockTime();
 
-    assert(pollAccount.currentPollDeadline.toNumber() < currentBlockTime);
+    assert(pollAccount.dropTime.toNumber() < currentBlockTime);
 
     const blockTime = await getBlockTime();
     const deadline = new BN(blockTime + 120);
@@ -343,7 +343,7 @@ describe("2) Poll creation testing", () => {
   //   );
 
   //   const pollAccount = await program.account.poll.fetch(pollAddress);
-  //   assert.equal(pollAccount.currentPollWinnerDrawn, true);
+  //   assert.equal(pollAccount.isWinnerDrawn, true);
   // });
 
   // it("2.7) A new poll can be created but failed due to deadline being smaller than the current time", async () => {
@@ -384,11 +384,11 @@ describe("2) Poll creation testing", () => {
 
   //   const adminBalanceAfter = await connection.getBalance(adminPubkey);
 
-  //   // Poll is not initialised again.
+  //   // HxuiDropTime is not initialised again.
   //   assert.equal(
   //     adminBalanceAfter,
   //     adminBalanceBefore,
-  //     "Poll account is recreacted.",
+  //     "HxuiDropTime account is recreacted.",
   //   );
   // });
 });
@@ -396,7 +396,7 @@ describe("2) Poll creation testing", () => {
 // describe("4) Testing 4", async () => {
 //   const [mintedTimestampAddressForAdmin, mintedTimestampBump] =
 //     PublicKey.findProgramAddressSync(
-//       [Buffer.from("minted_timestamp"), admin.publicKey.toBuffer()],
+//       [Buffer.from("free_mint_tracker"), admin.publicKey.toBuffer()],
 //       program.programId,
 //     );
 
@@ -440,7 +440,7 @@ describe("2) Poll creation testing", () => {
 //       adminBalanceBefore - adminBalanceAfter,
 //     );
 //     const mintedTimestampAccountData =
-//       await program.account.freeTokenTimestamp.fetch(
+//       await program.account.FreeMintTracker.fetch(
 //         mintedTimestampAddressForAdmin,
 //       );
 
@@ -523,7 +523,7 @@ describe("2) Poll creation testing", () => {
 //     assert.equal(adminTokenAccountData.amount, BigInt(FREE_TOKENS_MINT_AMOUNT));
 
 //     const mintedTimestampAccount =
-//       await program.account.freeTokenTimestamp.fetch(
+//       await program.account.FreeMintTracker.fetch(
 //         mintedTimestampAddressForAdmin,
 //       );
 
@@ -584,7 +584,7 @@ describe("2) Poll creation testing", () => {
 //       .rpc();
 
 //     const mintedTimestampAccount =
-//       await program.account.freeTokenTimestamp.fetch(
+//       await program.account.FreeMintTracker.fetch(
 //         mintedTimestampAddressForAdmin,
 //       );
 
@@ -640,7 +640,7 @@ describe("2) Poll creation testing", () => {
 //       .signers([admin])
 //       .rpc();
 //     const mintedTimestampAccount =
-//       await program.account.freeTokenTimestamp.fetch(
+//       await program.account.FreeMintTracker.fetch(
 //         mintedTimestampAddressForAdmin,
 //       );
 //     assert.equal(mintedTimestampAccount.closableTimestamp, 0);
@@ -680,7 +680,7 @@ describe("2) Poll creation testing", () => {
 //     );
 
 //     const mintedTimestampAccount =
-//       await program.account.freeTokenTimestamp.fetch(
+//       await program.account.FreeMintTracker.fetch(
 //         mintedTimestampAddressForAdmin,
 //       );
 
@@ -902,25 +902,25 @@ describe("5) Buying HXUI tokens for users[0]", async () => {
 //  users[0] has total 8 HXUI tokens
 // x----------------------------x
 
-interface Candidate {
+interface HxuiCandidate {
   name: string;
   description: string;
   address: PublicKey;
   bump: number;
 }
 const newCandidates: {
-  claimableWinner: Candidate[];
-  winner: Candidate[];
-  withdrawn: Candidate[];
-  active: Candidate[];
+  claimableWinner: HxuiCandidate[];
+  winner: HxuiCandidate[];
+  withdrawn: HxuiCandidate[];
+  active: HxuiCandidate[];
 } = {
   claimableWinner: [],
   winner: [],
   withdrawn: [],
   active: [],
 };
-const activeCandidates: Candidate[] = [];
-describe("5) Candidate creation, Voting candiate, Picking winner, Active Candidate verioius lifecycles.", () => {
+const activeCandidates: HxuiCandidate[] = [];
+describe("5) HxuiCandidate creation, Voting candiate, Picking winner, Active HxuiCandidate verioius lifecycles.", () => {
   before(async () => {
     const creationIxns: TransactionInstruction[] = [];
     for (let i = 0; i < users.length; i++) {
@@ -1006,17 +1006,18 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
 
     assert.equal(candidateAccount.name, candidateName);
     assert.equal(candidateAccount.description, candidateDescription);
-    assert(!!candidateAccount.candidateStatus.active);
-    assert.equal(candidateAccount.claimableIfWinner, false);
+    assert(!!candidateAccount.status.active);
+    assert.equal(candidateAccount.claimBackOffer, false);
     assert.equal(candidateAccount.bump, candidateBump);
-    assert.equal(candidateAccount.claimWindow, 0);
-    assert.equal(candidateAccount.numberOfVotes, 0);
-    assert(candidateAccount.totalReceipts.eq(new BN(0)));
-    assert.equal(candidateAccount.id, pollAccountBefore.totalCandidates);
+    assert.equal(candidateAccount.claimDeadline, 0);
+    assert.equal(candidateAccount.voteCount, 0);
+    assert(candidateAccount.receiptCount.eq(new BN(0)));
+    assert.equal(candidateAccount.id, pollAccountBefore.totalCandidateCount);
 
     // poll account state update.
     assert.equal(
-      pollAccountAfter.totalCandidates - pollAccountBefore.totalCandidates,
+      pollAccountAfter.totalCandidateCount -
+        pollAccountBefore.totalCandidateCount,
       1,
     );
     assert.equal(
@@ -1061,19 +1062,16 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
       const activeCandidateState = await program.account.candidate.fetch(
         activeCandidates[i].address,
       );
-      assert(
-        !!activeCandidateState.candidateStatus.active,
-        "Not an active candidate",
-      );
+      assert(!!activeCandidateState.status.active, "Not an active candidate");
       if (i == 3 || i == 4 || i == 5) {
         assert.equal(
-          activeCandidateState.claimableIfWinner,
+          activeCandidateState.claimBackOffer,
           true,
           "Not a claimable",
         );
       } else {
         assert.equal(
-          activeCandidateState.claimableIfWinner,
+          activeCandidateState.claimBackOffer,
           false,
           "is Claimable",
         );
@@ -1104,8 +1102,8 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
       activeCandidates[0].address,
     );
     assert(
-      candidateAccountAfter.numberOfVotes
-        .sub(candidateAccountBefore.numberOfVotes)
+      candidateAccountAfter.voteCount
+        .sub(candidateAccountBefore.voteCount)
         .eq(new BN(votes)),
     );
 
@@ -1160,8 +1158,8 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
           activeCandidates[i].address,
         );
         assert(
-          candidateAccountAfter.numberOfVotes
-            .sub(candidateAccount.numberOfVotes)
+          candidateAccountAfter.voteCount
+            .sub(candidateAccount.voteCount)
             .eq(new BN(votes)),
         );
 
@@ -1204,12 +1202,12 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
     const candidateState = await program.account.candidate.fetch(
       candidate.address,
     );
-    assert(candidateState.candidateStatus.active, "Not an active candidate");
+    assert(candidateState.status.active, "Not an active candidate");
 
     assert.equal(
-      candidateState.totalReceipts.isZero(),
+      candidateState.receiptCount.isZero(),
       true,
-      "Candidate has non-zero receipts",
+      "HxuiCandidate has non-zero receipts",
     );
     try {
       await program.methods
@@ -1237,8 +1235,8 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
       const candidateBefore = await program.account.candidate.fetch(
         activeCandidate.address,
       );
-      assert.equal(candidateBefore.claimableIfWinner, false);
-      assert(candidateBefore.candidateStatus.active);
+      assert.equal(candidateBefore.claimBackOffer, false);
+      assert(candidateBefore.status.active);
 
       await program.methods
         .withdrawCandidate(activeCandidate.name)
@@ -1252,7 +1250,7 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
         activeCandidate.address,
       );
 
-      assert(candidateAfter.candidateStatus.withdrawn);
+      assert(candidateAfter.status.withdrawn);
 
       const pollAccount = await program.account.poll.fetch(pollAddress);
       assert(!pollAccount.currentPollCandidates.includes(candidateAfter.id));
@@ -1283,15 +1281,15 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
 
         const candidate =
           await program.account.candidate.fetch(candidateAddress);
-        if (candidate.candidateStatus.active) {
+        if (candidate.status.active) {
           if (
             expectedWinnerCandidateId == undefined ||
-            candidate.numberOfVotes.cmp(maxVotes) == 1 ||
-            (candidate.numberOfVotes.cmp(maxVotes) == 0 &&
+            candidate.voteCount.cmp(maxVotes) == 1 ||
+            (candidate.voteCount.cmp(maxVotes) == 0 &&
               candidate.id < expectedWinnerCandidateId)
           ) {
             expectedWinnerCandidateId = candidate.id;
-            maxVotes = candidate.numberOfVotes;
+            maxVotes = candidate.voteCount;
             expectedWinnerIndex = i;
           }
           remainingAccounts.push({
@@ -1313,9 +1311,9 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
 
       const pollAccount = await program.account.poll.fetch(pollAddress);
       assert.equal(
-        pollAccount.currentPollWinnerDrawn,
+        pollAccount.isWinnerDrawn,
         true,
-        "Poll state is not updated after drawWinner ixn.",
+        "HxuiDropTime state is not updated after drawWinner ixn.",
       );
 
       // verify the winner.
@@ -1324,9 +1322,9 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
       );
 
       // Previously active -> winner or claimable winner.
-      if (winnerCandidate.claimableIfWinner) {
+      if (winnerCandidate.claimBackOffer) {
         assert(
-          !!winnerCandidate.candidateStatus.claimableWinner,
+          !!winnerCandidate.status.claimableWinner,
           "Not a claimable winner",
         );
         assert(
@@ -1338,7 +1336,7 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
           activeCandidates[expectedWinnerIndex],
         );
       } else {
-        assert(!!winnerCandidate.candidateStatus.winner, "Not a winner");
+        assert(!!winnerCandidate.status.winner, "Not a winner");
         assert(
           !(
             expectedWinnerIndex == 3 ||
@@ -1351,7 +1349,7 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
 
       assert(
         !pollAccount.currentPollCandidates.includes(expectedWinnerCandidateId),
-        "Poll state still considers the winner as competing candidate",
+        "HxuiDropTime state still considers the winner as competing candidate",
       );
       let i = 0;
 
@@ -1452,7 +1450,7 @@ describe("Advance candidate testing", () => {
 
   it("Attempt to claim tokens for a non active candidate before a withdraw window given such candidates have NON-ZERO receipts.", async () => {
     async function claimTokens(
-      nonActiveCandidate: Candidate,
+      nonActiveCandidate: HxuiCandidate,
       owner: Keypair,
       error: string,
     ) {
@@ -1461,17 +1459,17 @@ describe("Advance candidate testing", () => {
       );
 
       assert(
-        !candidateState.candidateStatus.active,
+        !candidateState.status.active,
         "An active candidate is attempted to close",
       );
       assert.equal(
-        candidateState.totalReceipts.isZero(),
+        candidateState.receiptCount.isZero(),
         false,
-        "Candidate has Zero receipts",
+        "HxuiCandidate has Zero receipts",
       );
 
       assert(
-        candidateState.claimWindow.eq(new BN(0)),
+        candidateState.claimDeadline.eq(new BN(0)),
         "Claim window is either live or closed.",
       );
       const [receiptAddress] = PublicKey.findProgramAddressSync(
@@ -1520,7 +1518,7 @@ describe("Advance candidate testing", () => {
   //   }
   it("Attempt to close non active candidates before a withdraw window given all candidates have NON-ZERO receipts.", async () => {
     async function closeNonActiveCandidate(
-      nonActiveCandidate: Candidate,
+      nonActiveCandidate: HxuiCandidate,
       error?: string,
     ) {
       const candidateState = await program.account.candidate.fetch(
@@ -1528,21 +1526,21 @@ describe("Advance candidate testing", () => {
       );
 
       assert(
-        !candidateState.candidateStatus.active,
+        !candidateState.status.active,
         "An active candidate is attempted to close",
       );
 
       //before a withrdraw window
       assert(
-        candidateState.claimWindow.eq(new BN(0)),
+        candidateState.claimDeadline.eq(new BN(0)),
         "Claim window is either live or closed.",
       );
 
       // non-zero receipts.
       assert.equal(
-        candidateState.totalReceipts.isZero(),
+        candidateState.receiptCount.isZero(),
         false,
-        "Candidate has non-zero receipts",
+        "HxuiCandidate has non-zero receipts",
       );
       try {
         await program.methods
@@ -1581,7 +1579,7 @@ describe("Advance candidate testing", () => {
 
   it("Attempt to clear receipts for non active candidates before a withdraw window given all candidates have NON-ZERO receipts.", async () => {
     async function clearReceiptForNonActiveCandidate(
-      nonActiveCandidate: Candidate,
+      nonActiveCandidate: HxuiCandidate,
       receiptHolder?: Keypair, // for additional check.
     ) {
       const candidateState = await program.account.candidate.fetch(
@@ -1589,18 +1587,18 @@ describe("Advance candidate testing", () => {
       );
 
       assert.equal(
-        candidateState.totalReceipts.isZero(),
+        candidateState.receiptCount.isZero(),
         false,
-        "Candidate has non-zero receipts",
+        "HxuiCandidate has non-zero receipts",
       );
 
       assert(
-        !candidateState.candidateStatus.active,
+        !candidateState.status.active,
         "An active candidate is attempted to close",
       );
 
       assert(
-        candidateState.claimWindow.eq(new BN(0)),
+        candidateState.claimDeadline.eq(new BN(0)),
         "Claim window is either live or closed.",
       );
 
@@ -1702,8 +1700,8 @@ describe("Advance candidate testing", () => {
         receiptBalanceBefore,
       );
       assert(
-        candidateStateBefore.totalReceipts
-          .sub(candidateStateAfter.totalReceipts)
+        candidateStateBefore.receiptCount
+          .sub(candidateStateAfter.receiptCount)
           .eq(new BN(1)),
       );
       assert.equal(tokenBalanceAfter, tokenBalanceBefore);
@@ -1739,7 +1737,7 @@ describe("Advance candidate testing", () => {
 
   it("Attempt to close Non-active candidates before a withdraw window given all candidates have ZERO receipts.", async () => {
     async function closeNonActiveCandidate(
-      nonActiveCandidate: Candidate,
+      nonActiveCandidate: HxuiCandidate,
       error?: string,
     ) {
       const candidateState = await program.account.candidate.fetch(
@@ -1747,18 +1745,18 @@ describe("Advance candidate testing", () => {
       );
 
       assert(
-        !candidateState.candidateStatus.active,
+        !candidateState.status.active,
         "An active candidate is attempted to close",
       );
       assert(
-        candidateState.claimWindow.eq(new BN(0)),
+        candidateState.claimDeadline.eq(new BN(0)),
         "Claim window is either live or closed.",
       );
 
       assert.equal(
-        candidateState.totalReceipts.isZero(),
+        candidateState.receiptCount.isZero(),
         true,
-        "Candidate has non-zero receipts",
+        "HxuiCandidate has non-zero receipts",
       );
       try {
         await program.methods
@@ -1823,7 +1821,7 @@ describe("Advance candidate testing", () => {
 
   it("Attempts to clear receipts during a withdraw window for Non active candidates except winner having non zero receipts", async () => {
     async function clearReceiptForNonActiveCandidate(
-      nonActiveCandidate: Candidate,
+      nonActiveCandidate: HxuiCandidate,
       receiptHolder?: Keypair, // for additional check.
     ) {
       const candidateState = await program.account.candidate.fetch(
@@ -1831,19 +1829,19 @@ describe("Advance candidate testing", () => {
       );
 
       assert.equal(
-        candidateState.totalReceipts.isZero(),
+        candidateState.receiptCount.isZero(),
         false,
-        "Candidate has non-zero receipts",
+        "HxuiCandidate has non-zero receipts",
       );
 
       assert(
-        !candidateState.candidateStatus.active,
+        !candidateState.status.active,
         "An active candidate is attempted to close",
       );
 
       const now = await getBlockTime();
       assert(
-        candidateState.claimWindow.cmp(new BN(now)) != -1,
+        candidateState.claimDeadline.cmp(new BN(now)) != -1,
         "Claim window is not closed",
       );
       const allVoteReceipts = await program.account.voteReceipt.all([
@@ -1913,7 +1911,7 @@ describe("Advance candidate testing", () => {
   //   }
   it("Attempt to close Non active candidates during a withdraw window given all candidates has Non zero receipts.", async () => {
     async function closeNonActiveCandidate(
-      nonActiveCandidate: Candidate,
+      nonActiveCandidate: HxuiCandidate,
       error?: string,
     ) {
       const candidateState = await program.account.candidate.fetch(
@@ -1921,19 +1919,19 @@ describe("Advance candidate testing", () => {
       );
 
       assert.equal(
-        candidateState.totalReceipts.isZero(),
+        candidateState.receiptCount.isZero(),
         false,
-        "Candidate has non-zero receipts",
+        "HxuiCandidate has non-zero receipts",
       );
 
       assert(
-        !candidateState.candidateStatus.active,
+        !candidateState.status.active,
         "An active candidate is attempted to close",
       );
 
       const now = await getBlockTime();
       assert(
-        candidateState.claimWindow.cmp(new BN(now)) != -1,
+        candidateState.claimDeadline.cmp(new BN(now)) != -1,
         "Claim window is not closed",
       );
       try {
@@ -1969,7 +1967,7 @@ describe("Advance candidate testing", () => {
   //   }
   it("Attempt to claim tokens for a non active candidate during a withdraw window given each non active candidate have NON-ZERO receipts.", async () => {
     async function claimTokensDuringWithdrawWindow(
-      nonActiveCandidate: Candidate,
+      nonActiveCandidate: HxuiCandidate,
       owner: Keypair,
     ) {
       const candidateState = await program.account.candidate.fetch(
@@ -1977,19 +1975,19 @@ describe("Advance candidate testing", () => {
       );
 
       assert.equal(
-        candidateState.totalReceipts.isZero(),
+        candidateState.receiptCount.isZero(),
         false,
-        "Candidate has zero receipts",
+        "HxuiCandidate has zero receipts",
       );
 
       assert(
-        !candidateState.candidateStatus.active,
+        !candidateState.status.active,
         "An active candidate is attempted to close",
       );
 
       const now = await getBlockTime();
       assert(
-        candidateState.claimWindow.cmp(new BN(now)) != -1,
+        candidateState.claimDeadline.cmp(new BN(now)) != -1,
         "Claim window is not closed",
       );
       const [receiptAddress] = PublicKey.findProgramAddressSync(
@@ -2054,20 +2052,20 @@ describe("Advance candidate testing", () => {
         "b",
       );
       assert(
-        candidateStateBefore.totalReceipts
-          .sub(candidateStateAfter.totalReceipts)
+        candidateStateBefore.receiptCount
+          .sub(candidateStateAfter.receiptCount)
           .eq(new BN(1)),
         "c",
       );
 
-      if (candidateStateBefore.candidateStatus.claimableWinner) {
+      if (candidateStateBefore.status.claimableWinner) {
         assert(
           receiptAccountState.tokens
             .div(new BN(2))
             .eq(new BN(tokenBalanceAfter - tokenBalanceBefore)),
           "d",
         );
-      } else if (candidateStateBefore.candidateStatus.claimableWinner) {
+      } else if (candidateStateBefore.status.claimableWinner) {
         assert(
           receiptAccountState.tokens.eq(
             new BN(tokenBalanceAfter - tokenBalanceBefore),
@@ -2092,7 +2090,7 @@ describe("Advance candidate testing", () => {
   //   }
 
   it("Attempt to close a Non active candidate during a withdraw window given each non active candidate has exactly 0 receipts", async () => {
-    async function closeNonActiveCandidate(nonActiveCandidate: Candidate) {
+    async function closeNonActiveCandidate(nonActiveCandidate: HxuiCandidate) {
       try {
         await program.methods
           .closeCandidate(nonActiveCandidate.name)
@@ -2142,13 +2140,13 @@ describe("Advance candidate testing", () => {
         candidate.address,
       );
       const now = await getBlockTime();
-      assert(candidateState.claimWindow.cmp(new BN(now)) == -1);
+      assert(candidateState.claimDeadline.cmp(new BN(now)) == -1);
     }
   });
 
   it("Attempt to claim tokens for a non active candidate after the withdraw window where each candidate has NON ZERO receipts.", async () => {
     async function claimTokens(
-      nonActiveCandidate: Candidate,
+      nonActiveCandidate: HxuiCandidate,
       owner: Keypair,
       error: string,
     ) {
@@ -2157,17 +2155,17 @@ describe("Advance candidate testing", () => {
       );
 
       assert(
-        !candidateState.candidateStatus.active,
+        !candidateState.status.active,
         "cannot claim tokens from an active candidate.",
       );
       assert.equal(
-        candidateState.totalReceipts.isZero(),
+        candidateState.receiptCount.isZero(),
         false,
-        "Candidate has Zero receipts",
+        "HxuiCandidate has Zero receipts",
       );
 
       const now = await getBlockTime();
-      assert(candidateState.claimWindow.cmp(new BN(now)) == -1, "a");
+      assert(candidateState.claimDeadline.cmp(new BN(now)) == -1, "a");
       const [receiptAddress] = PublicKey.findProgramAddressSync(
         [
           Buffer.from("vote_receipt"),
@@ -2208,7 +2206,7 @@ describe("Advance candidate testing", () => {
   //   }
   it("Attempt to close a Non active candidate after a withdraw window given each non active candidate have NON ZERO receipts.", async () => {
     // Non zero receipts
-    async function closeNonActiveCandidate(nonActiveCandidate: Candidate) {
+    async function closeNonActiveCandidate(nonActiveCandidate: HxuiCandidate) {
       try {
         await program.methods
           .closeCandidate(nonActiveCandidate.name)
@@ -2235,7 +2233,7 @@ describe("Advance candidate testing", () => {
   //   }
   it("Attempt to clear receipts for a non active candidate after a withdraw window where each non active candidate have non zero receipts", async () => {
     async function clearReceipts(
-      nonActiveCandidate: Candidate,
+      nonActiveCandidate: HxuiCandidate,
       receiptHolder?: Keypair, // for additional check.
     ) {
       const candidateState = await program.account.candidate.fetch(
@@ -2268,19 +2266,19 @@ describe("Advance candidate testing", () => {
       } = await connection.getTokenAccountBalance(tokenAddress);
 
       assert.equal(
-        candidateState.totalReceipts.isZero(),
+        candidateState.receiptCount.isZero(),
         false,
-        "Candidate has non-zero receipts",
+        "HxuiCandidate has non-zero receipts",
       );
 
       assert(
-        !candidateState.candidateStatus.active,
+        !candidateState.status.active,
         "An active candidate is attempted to close",
       );
 
       const now = await getBlockTime();
       assert(
-        candidateState.claimWindow.cmp(new BN(now)) == -1,
+        candidateState.claimDeadline.cmp(new BN(now)) == -1,
         "Claim window is either live or closed.",
       );
       const allVoteReceipts = await program.account.voteReceipt.all([
@@ -2344,8 +2342,8 @@ describe("Advance candidate testing", () => {
         receiptBalanceBefore,
       );
       assert(
-        candidateState.totalReceipts
-          .sub(candidateStateAfter.totalReceipts)
+        candidateState.receiptCount
+          .sub(candidateStateAfter.receiptCount)
           .eq(new BN(1)),
       );
       assert.equal(tokenBalanceAfter, tokenBalanceBefore);
@@ -2363,7 +2361,7 @@ describe("Advance candidate testing", () => {
 
   it("Attempt to close Non-active candidates after a withdraw window given all candidates have ZERO receipts.", async () => {
     async function closeNonActiveCandidate(
-      nonActiveCandidate: Candidate,
+      nonActiveCandidate: HxuiCandidate,
       error?: string,
     ) {
       const candidateState = await program.account.candidate.fetch(
@@ -2371,19 +2369,19 @@ describe("Advance candidate testing", () => {
       );
 
       assert(
-        !candidateState.candidateStatus.active,
+        !candidateState.status.active,
         "An active candidate is attempted to close",
       );
       const now = await getBlockTime();
       assert(
-        candidateState.claimWindow.cmp(new BN(now)) == -1,
+        candidateState.claimDeadline.cmp(new BN(now)) == -1,
         "Claim window is not closed",
       );
 
       assert.equal(
-        candidateState.totalReceipts.isZero(),
+        candidateState.receiptCount.isZero(),
         true,
-        "Candidate has non-zero receipts",
+        "HxuiCandidate has non-zero receipts",
       );
       try {
         await program.methods

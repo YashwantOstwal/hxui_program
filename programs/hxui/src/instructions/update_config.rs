@@ -1,13 +1,13 @@
 use anchor_lang::prelude::*;
 
-use crate::{Config};
+use crate::{HxuiConfig};
 
 #[derive(Accounts)]
 pub struct UpdateConfig<'info> {
     pub admin: Signer<'info>,
 
     #[account(mut, has_one = admin,seeds = [b"hxui_config"], bump = hxui_config.bump)]
-    pub hxui_config: Account<'info, Config>, 
+    pub hxui_config: Account<'info, HxuiConfig>, 
 
     pub new_admin:Option<Signer<'info>>,   
 }

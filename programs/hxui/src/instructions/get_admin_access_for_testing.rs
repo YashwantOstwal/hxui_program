@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use crate::{Config};
+use crate::{HxuiConfig};
 
 #[derive(Accounts)]
 pub struct GetAdminAccessForTesting<'info>{
@@ -9,7 +9,7 @@ pub struct GetAdminAccessForTesting<'info>{
         seeds = [b"hxui_config"],
         bump = hxui_config.bump,
     )]
-    pub hxui_config: Account<'info, Config>,
+    pub hxui_config: Account<'info, HxuiConfig>,
 }
 
 pub fn process_get_admin_access_for_testing(ctx:Context<GetAdminAccessForTesting>)->Result<()>{

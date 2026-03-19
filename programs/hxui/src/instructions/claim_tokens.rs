@@ -4,7 +4,7 @@ use anchor_spl::{
     token_interface::{Mint,Token2022,TokenAccount,mint_to,MintTo}
 };
 
-use crate::{ Candidate, CustomError, VoteReceipt, CandidateStatus};
+use crate::{ HxuiCandidate, CustomError, VoteReceipt, CandidateStatus};
 #[derive(Accounts)]
 #[instruction(name:String)]
 pub struct ClaimTokens<'info>{
@@ -33,7 +33,7 @@ pub struct ClaimTokens<'info>{
         seeds = [b"hxui_candidate",name.as_bytes()],
         bump = hxui_candidate.bump,
     )]
-    pub hxui_candidate:Account<'info,Candidate>,
+    pub hxui_candidate:Account<'info,HxuiCandidate>,
 
      #[account(
         mut,
@@ -58,16 +58,16 @@ pub struct ClaimTokens<'info>{
 pub fn claim_back_tokens(ctx:Context<ClaimTokens>)->Result<()>{
     let candidate = &mut ctx.accounts.hxui_candidate;
 
-    let is_withdrawn = candidate.candidate_status == CandidateStatus::Withdrawn;
-    let is_claimable_winner = candidate.candidate_status == CandidateStatus::ClaimableWinner;
+    let is_withdrawn = candidate.status == CandidateStatus::Withdrawn;
+    let is_claimable_winner = candidate.status == CandidateStatus::ClaimableWinner;
     require!(is_withdrawn || is_claimable_winner,CustomError::TokensCannotBeClaimed);
 
     let clock = Clock::get()?;
-    require!(candidate.claim_window!=0 && clock.unix_timestamp <= candidate.claim_window,CustomError::UnclaimableNow);
+    require!(candidate.claim_deadline!=0 && clock.unix_timestamp <= candidate.claim_deadline,CustomError::UnclaimableNow);
     
     let vote_receipt = & ctx.accounts.vote_receipt;
 
-    candidate.total_receipts -= 1;
+    candidate.receipt_count -= 1;
     let amount = if is_withdrawn {
         vote_receipt.tokens
     } else {

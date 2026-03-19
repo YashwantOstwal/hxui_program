@@ -2,9 +2,12 @@ use anchor_lang::prelude::*;
 
 #[account]
 #[derive(InitSpace)]
-pub struct Config{
+pub struct HxuiConfig{
     pub admin: Pubkey,
     pub price_per_token:u64,
     pub tokens_per_vote:u64,
+    pub free_tokens_per_mint:u64,
+    pub free_mints_per_epoch:u64,
+    pub free_mint_cool_down:u64,
     pub bump: u8
 }

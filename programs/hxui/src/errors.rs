@@ -32,7 +32,7 @@ pub enum CustomError {
     #[msg("The candidate is already a winner.")]
     CandidateAlreadyAWinner,
 
-    #[msg("Candidate is already withdrawn or is a winner.")]
+    #[msg("HxuiCandidate is already withdrawn or is a winner.")]
     CandidateIsNoLongerVotable,
 
     #[msg("The registration fees can be claimed only after 12 hours of unregistration.")]
@@ -114,7 +114,7 @@ pub enum CustomError {
     #[msg("Cannot set claimable for non active candidate.")]
     CannotSetClaimableForNonActiveCandidate,
 
-    #[msg("Candidate must have atleast 10 votes to be a winner.")]
+    #[msg("HxuiCandidate must have atleast 10 votes to be a winner.")]
     NotEnoughVotesForWinner
 
 }

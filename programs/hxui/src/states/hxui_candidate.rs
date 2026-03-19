@@ -2,15 +2,15 @@ use anchor_lang::prelude::*;
 
 #[account]
 #[derive(InitSpace)]
-pub struct Candidate{
+pub struct HxuiCandidate{
     pub id:u32,
-    pub candidate_status:CandidateStatus,
-    pub number_of_votes:u64,
-    pub claimable_if_winner:bool,
-    pub claim_window:i64,
+    pub status:CandidateStatus,
+    pub vote_count:u64,
+    pub claim_back_offer:bool,
+    pub claim_deadline:i64,
     pub bump:u8,
-    pub total_receipts:u64,
-        #[max_len(32)]
+    pub receipt_count:u64,
+    #[max_len(32)]
     pub name:String,
     #[max_len(280)]
     pub description:String,

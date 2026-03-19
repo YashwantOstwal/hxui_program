@@ -80,8 +80,17 @@ describe("Crank script testing. ~40 secs.", () => {
     await airdrop(admin.publicKey, LAMPORTS_PER_SOL);
     const pricePerToken = new anchor.BN(0.001 * LAMPORTS_PER_SOL);
     const tokensPerVote = new anchor.BN(2);
+    const freetokensPerMint = new anchor.BN(1);
+    const freeMintsPerEpoch = new anchor.BN(100);
+    const freeMintCoolDown = new anchor.BN(43200);
     await program.methods
-      .initialiseDapp(pricePerToken, tokensPerVote)
+      .initialiseDapp(
+        pricePerToken,
+        tokensPerVote,
+        freetokensPerMint,
+        freeMintsPerEpoch,
+        freeMintCoolDown,
+      )
       .accounts({
         admin: admin.publicKey,
         liteAuthority: admin.publicKey,
@@ -114,10 +123,10 @@ describe("Crank script testing. ~40 secs.", () => {
         .rpc();
 
       for (let j = 0; j < maxClearIxsInATx; j++) {
-        const numberOfVotes = new BN(Math.floor(Math.random() * 10) + 10);
+        const voteCount = new BN(Math.floor(Math.random() * 10) + 10);
 
         // Buying enough tokens to vote.
-        const numberOfTokens = numberOfVotes.mul(tokensPerVote);
+        const numberOfTokens = voteCount.mul(tokensPerVote);
         await program.methods
           .buyPaidTokens(numberOfTokens)
           .accounts({
@@ -126,7 +135,7 @@ describe("Crank script testing. ~40 secs.", () => {
           .signers([voters[j]])
           .rpc();
         await program.methods
-          .voteCandidate(candidateNames[i], numberOfVotes)
+          .voteCandidate(candidateNames[i], voteCount)
           .accounts({ owner: voters[j].publicKey })
           .signers([voters[j]])
           .rpc();
@@ -174,7 +183,7 @@ describe("Crank script testing. ~40 secs.", () => {
   });
 
   it("Verified all the receipts for a candidate (first candidate) is cleared given just the candidate Id and the vault is credited with expected lamports on clearance.", async () => {
-    const candidate1StateBefore = await program.account.candidate.fetch(
+    const candidate1StateBefore = await program.account.hxuiCandidate.fetch(
       candidateAddresses[0],
     );
     const vaultStateBefore = await connection.getBalance(vaultAddress);
@@ -214,7 +223,7 @@ describe("Crank script testing. ~40 secs.", () => {
           },
         },
       ]);
-    const candidate1StateAfter = await program.account.candidate.fetch(
+    const candidate1StateAfter = await program.account.hxuiCandidate.fetch(
       candidateAddresses[0],
     );
     const vaultBalanceAfter = await connection.getBalance(vaultAddress);
@@ -223,13 +232,13 @@ describe("Crank script testing. ~40 secs.", () => {
       await connection.getMinimumBalanceForRentExemption(21);
 
     // all the vote receipts for candidates[0] are closed
-    assert(candidate1StateAfter.totalReceipts.isZero());
+    assert(candidate1StateAfter.receiptCount.isZero());
     assert(voteReceiptsForCandidate1AfterClearance.length == 0);
 
     // rent of all the closed receipts is credited back to the vault.
     assert(
       new BN(vaultBalanceAfter - vaultStateBefore).eq(
-        candidate1StateBefore.totalReceipts.mul(new BN(voteReceiptRent)),
+        candidate1StateBefore.receiptCount.mul(new BN(voteReceiptRent)),
       ),
     );
 
@@ -262,9 +271,9 @@ describe("Crank script testing. ~40 secs.", () => {
       voteReceiptAccountCounts++;
       // }
     }
-    const candidate2State = await program.account.candidate.fetch(
+    const candidate2State = await program.account.hxuiCandidate.fetch(
       candidateAddresses[1],
     );
-    assert(candidate2State.totalReceipts.eq(new BN(voteReceiptAccountCounts)));
+    assert(candidate2State.receiptCount.eq(new BN(voteReceiptAccountCounts)));
   });
 });

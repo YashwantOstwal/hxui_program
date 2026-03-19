@@ -4,7 +4,7 @@ use anchor_spl::{
     token_interface::{Mint,Token2022,TokenAccount,mint_to,MintTo}
 };
 
-use crate::{Config};
+use crate::{HxuiConfig};
 #[derive(Accounts)]
 pub struct BuyPaidTokens<'info>{
     #[account(mut)]
@@ -33,7 +33,7 @@ pub struct BuyPaidTokens<'info>{
         seeds = [b"hxui_config"],
         bump = hxui_config.bump
     )]
-    pub hxui_config:Account<'info,Config>,
+    pub hxui_config:Account<'info,HxuiConfig>,
 
     #[account(
         mut,

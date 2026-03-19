@@ -6,7 +6,7 @@ use spl_token_metadata_interface::state::TokenMetadata;
 use spl_type_length_value::variable_len_pack::VariableLenPack;
 
 
-use crate::{ANCHOR_DISCRIMINATOR, Config, CustomError, FREE_TOKENS_PER_EPOCH, FreeTokensCounter, Poll, VoteReceipt};
+use crate::{ANCHOR_DISCRIMINATOR, HxuiConfig, CustomError, FREE_TOKENS_PER_EPOCH, HxuiFreeMintCounter, HxuiDropTime, VoteReceipt};
 #[derive(Accounts)]
 pub struct InitialiseDapp<'info>{
     #[account(mut)]
@@ -39,9 +39,9 @@ pub struct InitialiseDapp<'info>{
         payer = admin,
         seeds = [b"hxui_config"],
         bump,
-        space = ANCHOR_DISCRIMINATOR + Config::INIT_SPACE
+        space = ANCHOR_DISCRIMINATOR + HxuiConfig::INIT_SPACE
     )]
-    pub hxui_config: Account<'info,Config>,
+    pub hxui_config: Account<'info,HxuiConfig>,
     
     #[account(
         mut,
@@ -55,18 +55,18 @@ pub struct InitialiseDapp<'info>{
         payer = admin,
         seeds = [b"hxui_free_tokens_counter"],
         bump,
-        space = ANCHOR_DISCRIMINATOR + FreeTokensCounter::INIT_SPACE
+        space = ANCHOR_DISCRIMINATOR + HxuiFreeMintCounter::INIT_SPACE
     )]
-    pub free_tokens_counter:Account<'info,FreeTokensCounter>,
+    pub free_tokens_counter:Account<'info,HxuiFreeMintCounter>,
 
         #[account(
         init,
         payer = admin,
-        space = ANCHOR_DISCRIMINATOR + Poll::INIT_SPACE,
-        seeds = [b"hxui_poll"],
+        space = ANCHOR_DISCRIMINATOR + HxuiDropTime::INIT_SPACE,
+        seeds = [b"hxui_drop_time"],
         bump,
     )]
-    pub hxui_poll:Account<'info,Poll>,
+    pub hxui_drop_time:Account<'info,HxuiDropTime>,
 
     pub system_program:Program<'info,System>,
     pub token_program:Program<'info,Token2022>
@@ -77,10 +77,10 @@ pub struct TokenMetadataArgs {
     symbol:String,
     uri:String,
 }
-pub fn initialise_config(ctx:Context<InitialiseDapp>,config:Config)->Result<()>{
+pub fn initialise_config(ctx:Context<InitialiseDapp>,config:HxuiConfig)->Result<()>{
 
-    let poll_account = &mut ctx.accounts.hxui_poll;
-    poll_account.bump = ctx.bumps.hxui_poll;
+    let poll_account = &mut ctx.accounts.hxui_drop_time;
+    poll_account.bump = ctx.bumps.hxui_drop_time;
     let rent = Rent::get()?;
     require!(2* config.price_per_token >= rent.minimum_balance(VoteReceipt::INIT_SPACE) ,CustomError::TokenPriceNotSufficient);
     let config_account = &mut ctx.accounts.hxui_config;
@@ -89,7 +89,7 @@ pub fn initialise_config(ctx:Context<InitialiseDapp>,config:Config)->Result<()>{
     let free_tokens_counter = &mut ctx.accounts.free_tokens_counter;
     free_tokens_counter.bump = ctx.bumps.free_tokens_counter;
     free_tokens_counter.current_epoch = (Clock::get()?).epoch;
-    free_tokens_counter.remaining_free_tokens = FREE_TOKENS_PER_EPOCH;
+    free_tokens_counter.remaining_free_mints = FREE_TOKENS_PER_EPOCH;
 
     let cpi_context = CpiContext::new(ctx.accounts.system_program.to_account_info(),Transfer{
         from:ctx.accounts.admin.to_account_info(),

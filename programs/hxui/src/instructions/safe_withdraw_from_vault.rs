@@ -5,7 +5,7 @@ use anchor_spl::{
 
 
 
-use crate::{ANCHOR_DISCRIMINATOR, Config, CustomError, VoteReceipt};
+use crate::{ANCHOR_DISCRIMINATOR, HxuiConfig, CustomError, VoteReceipt};
 #[derive(Accounts)]
 pub struct SafeWithdrawFromVault<'info>{
     #[account(mut)]
@@ -16,7 +16,7 @@ pub struct SafeWithdrawFromVault<'info>{
         seeds = [b"hxui_config"],
         bump = hxui_config.bump,
     )]
-    pub hxui_config: Account<'info,Config>,
+    pub hxui_config: Account<'info,HxuiConfig>,
     #[account(
         mut,
         seeds = [b"hxui_vault"],

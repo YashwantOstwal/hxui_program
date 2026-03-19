@@ -25,8 +25,8 @@ import {
 } from "litesvm";
 import IDL from "../target/idl/hxui.json" with { type: "json" };
 
-const FREE_TOKENS_MINT_AMOUNT = 1;
-const FREE_TOKENS_PER_EPOCH = 100;
+// const FREE_TOKENS_MINT_AMOUNT = 1;
+// const FREE_TOKENS_PER_EPOCH = 100;
 const COOLDOWN = 43200;
 const svm = new LiteSVM();
 const programId = new PublicKey(IDL.address);
@@ -42,6 +42,9 @@ const programPath = new URL(
 svm.addProgramFromFile(programId, programPath);
 const price_per_token = new anchor.BN(0.001 * LAMPORTS_PER_SOL);
 const tokens_per_vote = new anchor.BN(2);
+const free_tokens_per_mint = new anchor.BN(1);
+const free_mints_per_epoch = new anchor.BN(100);
+const free_mint_cool_down = new anchor.BN(43200);
 const hxui_metadata = {
   name: "100xui",
   symbol: "HXUI",
@@ -60,7 +63,7 @@ const SEEDS: Record<string, string> = {
   hxuiMint: "hxui_mint",
   hxuiConfig: "hxui_config",
   hxuiLiteMint: "hxui_lite_mint",
-  hxuiPoll: "hxui_poll",
+  hxuiPoll: "hxui_drop_time",
   hxuiFreeTokensCounter: "hxui_free_tokens_counter",
 } as const;
 
@@ -114,6 +117,9 @@ describe("1) initialise_dapp instruction testing", () => {
     const data = coder.instruction.encode("initialise_dapp", {
       price_per_token,
       tokens_per_vote,
+      free_tokens_per_mint,
+      free_mints_per_epoch,
+      free_mint_cool_down,
     });
     const ix = new TransactionInstruction({
       programId,
@@ -167,14 +173,18 @@ describe("1) initialise_dapp instruction testing", () => {
 
     const hxuiConfigAccount = svm.getAccount(getPda(SEEDS.hxuiConfig).address);
     const hxuiConfigData = coder.accounts.decode(
-      "Config",
+      "HxuiConfig",
       Buffer.from(hxuiConfigAccount.data),
     );
 
-    //Config account validation.
+    //HxuiConfig account validation.
     assert(hxuiConfigData.admin.equals(adminPubkey));
     assert(hxuiConfigData.tokens_per_vote.eq(tokens_per_vote));
     assert(hxuiConfigData.price_per_token.eq(price_per_token));
+    // assert(hxuiConfigData.free_tokens_per_mint.eq(free_tokens_per_mint));
+    // assert(hxuiConfigData.free_mints_per_epoch.eq(free_mints_per_epoch));
+    // assert(hxuiConfigData.free_mint_cool_down.eq(price_per_token));
+
     assert.equal(hxuiConfigData.bump, getPda(SEEDS.hxuiConfig).bump);
 
     // Vault is initialised and funded with minimum lamports to exempt rent
@@ -187,8 +197,9 @@ describe("1) initialise_dapp instruction testing", () => {
     const data = coder.instruction.encode("initialise_dapp", {
       price_per_token,
       tokens_per_vote,
-      hxui_metadata,
-      hxui_lite_metadata: hxui_metadata,
+      free_tokens_per_mint,
+      free_mints_per_epoch,
+      free_mint_cool_down,
     });
     const ix = new TransactionInstruction({
       programId,
@@ -271,18 +282,18 @@ describe("1) initialise_dapp instruction testing", () => {
     assert(hxuiLiteMintData.freezeAuthority === null);
   });
 
-  it("1.4) Poll account created.", () => {
+  it("1.4) HxuiDropTime account created.", () => {
     const pollAccountData = getPollAccount();
     assert(pollAccountData !== null, "1");
-    assert(pollAccountData.current_poll_deadline.isZero(), "2");
-    assert.equal(pollAccountData.current_poll_winner_drawn, false, "3");
-    assert.equal(pollAccountData.total_candidates, 0);
-    assert.equal(pollAccountData.current_poll_candidates.length, 0);
+    assert(pollAccountData.drop_timestamp.isZero(), "2");
+    assert.equal(pollAccountData.is_winner_drawn, false, "3");
+    assert.equal(pollAccountData.total_candidate_count, 0);
+    assert.equal(pollAccountData.active_candidate_ids.length, 0);
     assert.equal(pollAccountData.bump, getPda(SEEDS.hxuiPoll).bump);
   });
 });
 
-describe("2) Poll creation testing", () => {
+describe("2) HxuiDropTime creation testing", () => {
   it("2.1) Creating a Genesis poll with valid deadline.", () => {
     const now = svm.getClock();
     const poll_deadline = new anchor.BN(now.unixTimestamp + BigInt(86400 * 7)); // 1 week from now.
@@ -319,10 +330,10 @@ describe("2) Poll creation testing", () => {
 
     const pollAccountData = getPollAccount();
 
-    assert(pollAccountData.current_poll_deadline.eq(poll_deadline));
-    assert.equal(pollAccountData.current_poll_winner_drawn, false);
-    assert.equal(pollAccountData.total_candidates, 0);
-    assert.equal(pollAccountData.current_poll_candidates.length, 0);
+    assert(pollAccountData.drop_timestamp.eq(poll_deadline));
+    assert.equal(pollAccountData.is_winner_drawn, false);
+    assert.equal(pollAccountData.total_candidate_count, 0);
+    assert.equal(pollAccountData.active_candidate_ids.length, 0);
     assert.equal(pollAccountData.bump, getPda(SEEDS.hxuiPoll).bump);
   });
 
@@ -369,9 +380,7 @@ describe("2) Poll creation testing", () => {
 
     const pollAccountData = getPollAccount();
     // Ensuring the poll has ended.
-    assert(
-      clock.unixTimestamp > pollAccountData.current_poll_deadline.toNumber(),
-    );
+    assert(clock.unixTimestamp > pollAccountData.drop_timestamp.toNumber());
 
     const now = clock.unixTimestamp;
     const poll_deadline = new anchor.BN(now + BigInt(86400 * 7));
@@ -425,7 +434,7 @@ describe("2) Poll creation testing", () => {
 
 const [mintedTimestampAddressForAdmin, mintedTimestampBump] =
   PublicKey.findProgramAddressSync(
-    [Buffer.from("minted_timestamp"), admin.publicKey.toBuffer()],
+    [Buffer.from("free_mint_tracker"), admin.publicKey.toBuffer()],
     programId,
   );
 
@@ -459,12 +468,12 @@ describe("4) Testing 4", () => {
     );
 
     const mintedTimestampAccountData = coder.accounts.decode(
-      "FreeTokenTimestamp",
+      "FreeMintTracker",
       Buffer.from(mintedTimestampAccount.data),
     );
 
-    assert.equal(mintedTimestampAccountData.next_mintable_timestamp, now);
-    assert.equal(mintedTimestampAccountData.closable_timestamp, 0);
+    assert.equal(mintedTimestampAccountData.next_mint_timestamp, now);
+    assert.equal(mintedTimestampAccountData.unregistered, false);
     assert.equal(mintedTimestampAccountData.bump, mintedTimestampBump);
   });
 
@@ -493,10 +502,11 @@ describe("4) Testing 4", () => {
     sendTransaction([creationIx, mintIx], [admin, liteAuthority]);
     const freeTokensCounterDataAfter = getFreeTokensCounterAccount();
 
+    const configAccount = getConfigAccount();
     assert(
-      freeTokensCounterDataBefore.remaining_free_tokens
-        .sub(freeTokensCounterDataAfter.remaining_free_tokens)
-        .eq(new anchor.BN(FREE_TOKENS_MINT_AMOUNT)),
+      freeTokensCounterDataBefore.remaining_free_mints
+        .sub(freeTokensCounterDataAfter.remaining_free_mints)
+        .eq(new anchor.BN(configAccount.free_tokens_per_mint)),
     );
     // TODO: if is_new_epoch.
 
@@ -513,27 +523,25 @@ describe("4) Testing 4", () => {
     assert(tokenState.owner.equals(admin.publicKey));
 
     // the token balance is 0n
-    assert.equal(tokenState.amount, BigInt(FREE_TOKENS_MINT_AMOUNT));
+
+    assert.equal(tokenState.amount, configAccount.free_tokens_per_mint);
 
     const mintedTimestampAccount = svm.getAccount(
       mintedTimestampAddressForAdmin,
     );
     const mintedTimestampAccountData = coder.accounts.decode(
-      "FreeTokenTimestamp",
+      "FreeMintTracker",
       Buffer.from(mintedTimestampAccount.data),
     );
 
     const now = svm.getClock().unixTimestamp;
     assert(
-      mintedTimestampAccountData.next_mintable_timestamp.eq(
+      mintedTimestampAccountData.next_mint_timestamp.eq(
         new anchor.BN(now + BigInt(43200)),
         "lorem",
       ),
     );
-    assert(
-      mintedTimestampAccountData.closable_timestamp.eq(new anchor.BN(0)),
-      "lorem2",
-    );
+    assert(!mintedTimestampAccountData.unregistered, "lorem2");
     assert.equal(
       mintedTimestampAccountData.bump,
       mintedTimestampBump,
@@ -568,23 +576,19 @@ describe("4) Testing 4", () => {
       mintedTimestampAddressForAdmin,
     );
     const mintedTimestampAccountData = coder.accounts.decode(
-      "FreeTokenTimestamp",
+      "FreeMintTracker",
       Buffer.from(mintedTimestampAccount.data),
     );
 
     const now = svm.getClock().unixTimestamp;
     assert(
-      mintedTimestampAccountData.next_mintable_timestamp.eq(
+      mintedTimestampAccountData.next_mint_timestamp.eq(
         new anchor.BN(now + BigInt(43200)),
       ),
     );
 
     // One can close this account and claim back the rent after the cooldown.
-    assert(
-      mintedTimestampAccountData.closable_timestamp.eq(
-        new anchor.BN(mintedTimestampAccountData.next_mintable_timestamp),
-      ),
-    );
+    assert(mintedTimestampAccountData.unregistered);
   });
 
   it("4.8) Attempt to mint new tokens after unregistering. FAILS", () => {
@@ -638,10 +642,10 @@ describe("4) Testing 4", () => {
       mintedTimestampAddressForAdmin,
     );
     const mintedTimestampAccountData = coder.accounts.decode(
-      "FreeTokenTimestamp",
+      "FreeMintTracker",
       Buffer.from(mintedTimestampAccount.data),
     );
-    assert(mintedTimestampAccountData.closable_timestamp.eq(new anchor.BN(0)));
+    assert(!mintedTimestampAccountData.unregistered);
   });
   it("4.11) Mint free tokens to admin token account after cooldown", () => {
     const now = svm.getClock();
@@ -655,31 +659,31 @@ describe("4) Testing 4", () => {
 
     const tokenStateAfter = getHxuiLiteAccount(adminPubkey);
     const freeTokensCounterDataAfter = getFreeTokensCounterAccount();
-
+    const configAccount = getConfigAccount();
     assert.equal(
       tokenStateAfter.amount - tokenStateBefore.amount,
-      BigInt(FREE_TOKENS_MINT_AMOUNT),
+      BigInt(configAccount.free_tokens_per_mint),
     );
     assert(
-      freeTokensCounterDataBefore.remaining_free_tokens
-        .sub(freeTokensCounterDataAfter.remaining_free_tokens)
-        .eq(new anchor.BN(FREE_TOKENS_MINT_AMOUNT)),
+      freeTokensCounterDataBefore.remaining_free_mints
+        .sub(freeTokensCounterDataAfter.remaining_free_mints)
+        .eq(new anchor.BN(configAccount.free_tokens_per_mint)),
     );
 
     const mintedTimestampAccount = svm.getAccount(
       mintedTimestampAddressForAdmin,
     );
     const mintedTimestampAccountData = coder.accounts.decode(
-      "FreeTokenTimestamp",
+      "FreeMintTracker",
       Buffer.from(mintedTimestampAccount.data),
     );
 
     assert(
-      mintedTimestampAccountData.next_mintable_timestamp.eq(
+      mintedTimestampAccountData.next_mint_timestamp.eq(
         new anchor.BN(now.unixTimestamp + BigInt(43200)),
       ),
     );
-    assert(mintedTimestampAccountData.closable_timestamp.eq(new anchor.BN(0)));
+    assert(!mintedTimestampAccountData.unregistered);
   });
 
   it("4.12) Unregister after cooldown allows to claim registration fees immediately", async () => {
@@ -712,11 +716,13 @@ describe("4) Testing 4", () => {
     const freeTokensCounter = getFreeTokensCounterAccount();
     const buffer = Math.floor(Math.random() * 3);
     // attempt to mint free tokens for more users than can be minted for.
+
+    const configAccount = getConfigAccount();
     for (
       let i = 0;
       i <=
-      freeTokensCounter.remaining_free_tokens.toNumber() /
-        FREE_TOKENS_MINT_AMOUNT +
+      freeTokensCounter.remaining_free_mints.toNumber() /
+        configAccount.free_tokens_per_mint +
         buffer;
       i++
     ) {
@@ -747,8 +753,8 @@ describe("4) Testing 4", () => {
         assert(
           i >=
             Math.floor(
-              freeTokensCounter.remaining_free_tokens.toNumber() /
-                FREE_TOKENS_MINT_AMOUNT,
+              freeTokensCounter.remaining_free_mints.toNumber() /
+                configAccount.free_tokens_per_mint,
             ),
           "b",
         );
@@ -756,13 +762,13 @@ describe("4) Testing 4", () => {
         assert(
           i <
             Math.floor(
-              freeTokensCounter.remaining_free_tokens.toNumber() /
-                FREE_TOKENS_MINT_AMOUNT,
+              freeTokensCounter.remaining_free_mints.toNumber() /
+                configAccount.free_tokens_per_mint,
             ),
           "a",
         );
         const tokenAccount = getHxuiLiteAccount(user.publicKey);
-        assert.equal(tokenAccount.amount, BigInt(FREE_TOKENS_MINT_AMOUNT));
+        assert.equal(tokenAccount.amount, configAccount.free_tokens_per_mint);
       }
     }
   }).slow(5000);
@@ -770,9 +776,11 @@ describe("4) Testing 4", () => {
     const freeTokensCounter = getFreeTokensCounterAccount();
 
     //minting have failed in the previous test and will fail when minted in this epoch
+    const configAccount = getConfigAccount();
+    configAccount.free_tokens_per_mint;
     assert(
-      freeTokensCounter.remaining_free_tokens.cmp(
-        new anchor.BN(FREE_TOKENS_MINT_AMOUNT),
+      freeTokensCounter.remaining_free_mints.cmp(
+        new anchor.BN(configAccount.free_tokens_per_mint),
       ) == -1,
     );
 
@@ -805,9 +813,9 @@ describe("4) Testing 4", () => {
     const freeTokensCounterDataAfter = getFreeTokensCounterAccount();
 
     assert(
-      freeTokensCounterDataAfter.remaining_free_tokens.eq(
-        new anchor.BN(FREE_TOKENS_PER_EPOCH).sub(
-          new anchor.BN(FREE_TOKENS_MINT_AMOUNT),
+      freeTokensCounterDataAfter.remaining_free_mints.eq(
+        new anchor.BN(configAccount.free_mints_per_epoch).sub(
+          new anchor.BN(configAccount.free_tokens_per_mint),
         ),
       ),
     );
@@ -859,7 +867,7 @@ describe("5) Buying HXUI tokens for users[0]", async () => {
       getPda(SEEDS.hxuiConfig).address,
     );
     const hxuiConfigState = coder.accounts.decode(
-      "Config",
+      "HxuiConfig",
       Buffer.from(hxuiConfigAccountInfo.data),
     );
     const tokenAccountRent = svm.getBalance(tokenAddress);
@@ -894,7 +902,7 @@ describe("5) Buying HXUI tokens for users[0]", async () => {
       getPda(SEEDS.hxuiConfig).address,
     );
     const hxuiConfigState = coder.accounts.decode(
-      "Config",
+      "HxuiConfig",
       Buffer.from(hxuiConfigAccountInfo.data),
     );
     assert(
@@ -908,25 +916,25 @@ describe("5) Buying HXUI tokens for users[0]", async () => {
 //  users[0] has 200 HXUI tokens and users[1] has 100 HXUI tokens
 // x----------------------------x
 
-interface Candidate {
+interface HxuiCandidate {
   name: string;
   description: string;
   address: PublicKey;
   bump: number;
 }
 const newCandidates: {
-  claimableWinner: Candidate[];
-  winner: Candidate[];
-  withdrawn: Candidate[];
-  active: Candidate[];
+  claimableWinner: HxuiCandidate[];
+  winner: HxuiCandidate[];
+  withdrawn: HxuiCandidate[];
+  active: HxuiCandidate[];
 } = {
   claimableWinner: [],
   winner: [],
   withdrawn: [],
   active: [],
 };
-const activeCandidates: Candidate[] = [];
-describe("5) Candidate creation, Voting candiate, Picking winner, Active Candidate verioius lifecycles.", () => {
+const activeCandidates: HxuiCandidate[] = [];
+describe("5) HxuiCandidate creation, Voting candiate, Picking winner, Active HxuiCandidate verioius lifecycles.", () => {
   before(async () => {
     const ixs: TransactionInstruction[] = [];
     for (let i = 0; i < users.length; i++) {
@@ -1000,7 +1008,7 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
       {
         name: candidateName,
         description: candidateDescription,
-        claimable_if_winner: false,
+        claim_back_offer: false,
       },
     );
     sendTransaction([ix], [admin]);
@@ -1017,27 +1025,26 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
 
     assert.equal(candidateState.name, candidateName);
     assert.equal(candidateState.description, candidateDescription);
-    assert(!!candidateState.candidate_status.Active);
-    assert.equal(candidateState.claimable_if_winner, false);
+    assert(!!candidateState.status.Active);
+    assert.equal(candidateState.claim_back_offer, false);
     assert.equal(candidateState.bump, candidateBump);
-    assert.equal(candidateState.claim_window, 0);
-    assert.equal(candidateState.number_of_votes, 0);
-    assert(candidateState.total_receipts.eq(new anchor.BN(0)));
-    assert.equal(candidateState.id, pollAccountBefore.total_candidates);
+    assert.equal(candidateState.claim_deadline, 0);
+    assert.equal(candidateState.vote_count, 0);
+    assert(candidateState.receipt_count.eq(new anchor.BN(0)));
+    assert.equal(candidateState.id, pollAccountBefore.total_candidate_count);
 
     // poll account state update.
     assert.equal(
-      pollAccountAfter.total_candidates - pollAccountBefore.total_candidates,
+      pollAccountAfter.total_candidate_count -
+        pollAccountBefore.total_candidate_count,
       1,
     );
     assert.equal(
-      pollAccountAfter.current_poll_candidates.length -
-        pollAccountBefore.current_poll_candidates.length,
+      pollAccountAfter.active_candidate_ids.length -
+        pollAccountBefore.active_candidate_ids.length,
       1,
     );
-    assert(
-      pollAccountAfter.current_poll_candidates.includes(candidateState.id),
-    );
+    assert(pollAccountAfter.active_candidate_ids.includes(candidateState.id));
 
     activeCandidates.push({
       name: candidateName,
@@ -1056,7 +1063,7 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
         {
           name,
           description,
-          claimable_if_winner: i == 3 || i == 4 || i == 5,
+          claim_back_offer: i == 3 || i == 4 || i == 5,
         },
       );
       sendTransaction([ix], [admin]);
@@ -1072,19 +1079,16 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
       const activeCandidateState = await getCandidateAccount(
         activeCandidates[i].name,
       );
-      assert(
-        !!activeCandidateState.candidate_status.Active,
-        "Not an active candidate",
-      );
+      assert(!!activeCandidateState.status.Active, "Not an active candidate");
       if (i == 3 || i == 4 || i == 5) {
         assert.equal(
-          activeCandidateState.claimable_if_winner,
+          activeCandidateState.claim_back_offer,
           true,
           "Not a claimable",
         );
       } else {
         assert.equal(
-          activeCandidateState.claimable_if_winner,
+          activeCandidateState.claim_back_offer,
           false,
           "is Claimable",
         );
@@ -1112,8 +1116,8 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
 
     const candidateStateAfter = getCandidateAccount(activeCandidates[0].name);
     assert(
-      candidateStateAfter.number_of_votes
-        .sub(candidateAccountBefore.number_of_votes)
+      candidateStateAfter.vote_count
+        .sub(candidateAccountBefore.vote_count)
         .eq(new anchor.BN(votes)),
     );
     const tokenAccountStateAfter = getHxuiLiteAccount(users[1].publicKey);
@@ -1178,8 +1182,8 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
         const tokenAccountAfter = getHxuiAccount(user.publicKey);
 
         assert(
-          candidateAccountAfter.number_of_votes
-            .sub(candidateAccountBefore.number_of_votes)
+          candidateAccountAfter.vote_count
+            .sub(candidateAccountBefore.vote_count)
             .eq(new anchor.BN(votes)),
         );
 
@@ -1221,13 +1225,13 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
         const tokenAccountAfter = getHxuiLiteAccount(user.publicKey);
 
         assert(
-          candidateAccountAfter.number_of_votes
-            .sub(candidateAccountBefore.number_of_votes)
+          candidateAccountAfter.vote_count
+            .sub(candidateAccountBefore.vote_count)
             .eq(new anchor.BN(votes)),
         );
         assert(
-          candidateAccountAfter.total_receipts
-            .sub(candidateAccountBefore.total_receipts)
+          candidateAccountAfter.receipt_count
+            .sub(candidateAccountBefore.receipt_count)
             .eq(new anchor.BN(0)),
           "A receipt was indeed created",
         );
@@ -1286,12 +1290,12 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
 
     const candidateName = activeCandidates[0].name;
     const candidateState = getCandidateAccount(candidateName);
-    assert(candidateState.candidate_status.Active, "Not an active candidate");
+    assert(candidateState.status.Active, "Not an active candidate");
 
     assert.equal(
-      candidateState.total_receipts.isZero(),
+      candidateState.receipt_count.isZero(),
       true,
-      "Candidate has non-zero receipts",
+      "HxuiCandidate has non-zero receipts",
     );
 
     const ix = getCloseCandidateInstruction({ candidateName });
@@ -1302,17 +1306,14 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
   it("5.4 Set claimback offer for an active candidate after initialisation", () => {
     const candidateName = activeCandidates[0].name;
     const candidateStateBefore = getCandidateAccount(candidateName);
-    assert(
-      candidateStateBefore.candidate_status.Active,
-      "Not an active candidate",
-    );
+    assert(candidateStateBefore.status.Active, "Not an active candidate");
 
-    assert.equal(candidateStateBefore.claimable_if_winner, false, "1");
+    assert.equal(candidateStateBefore.claim_back_offer, false, "1");
 
     const ix = getClaimbackOfferInstruction({ candidateName });
     sendTransaction([ix], [admin]);
     const candidateStateAfter = getCandidateAccount(candidateName);
-    assert.equal(candidateStateAfter.claimable_if_winner, true, "2");
+    assert.equal(candidateStateAfter.claim_back_offer, true, "2");
   });
   // usersHXUITokenBalance = [30,100,0]
   // usersHXUILiteTokenBalance = [5,3,1]
@@ -1327,17 +1328,17 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
       // const candidateBefore = await program.account.candidate.fetch(
       //   activeCandidate.address,
       // );
-      assert(candidateStateBefore.candidate_status.Active);
+      assert(candidateStateBefore.status.Active);
 
       const ix = getWithdrawCandidateInstruction({ candidateName });
       sendTransaction([ix], [admin]);
       const candidateStateAfter = getCandidateAccount(candidateName);
 
-      assert(candidateStateAfter.candidate_status.Withdrawn);
+      assert(candidateStateAfter.status.Withdrawn);
 
       const pollAccount = getPollAccount();
       assert(
-        !pollAccount.current_poll_candidates.includes(candidateStateAfter.id),
+        !pollAccount.active_candidate_ids.includes(candidateStateAfter.id),
       );
       newCandidates.withdrawn.push(activeCandidates[i]);
     }
@@ -1363,17 +1364,17 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
 
         const candidateAccount = getCandidateAccount(activeCandidates[i].name);
         if (
-          candidateAccount.candidate_status.Active &&
-          candidateAccount.number_of_votes.cmp(new anchor.BN(10)) !== -1
+          candidateAccount.status.Active &&
+          candidateAccount.vote_count.cmp(new anchor.BN(10)) !== -1
         ) {
           if (
             expectedWinnerCandidateId == undefined ||
-            candidateAccount.number_of_votes.cmp(maxVotes) == 1 ||
-            (candidateAccount.number_of_votes.cmp(maxVotes) == 0 &&
+            candidateAccount.vote_count.cmp(maxVotes) == 1 ||
+            (candidateAccount.vote_count.cmp(maxVotes) == 0 &&
               candidateAccount.id < expectedWinnerCandidateId)
           ) {
             expectedWinnerCandidateId = candidateAccount.id;
-            maxVotes = candidateAccount.number_of_votes;
+            maxVotes = candidateAccount.vote_count;
             expectedWinnerIndex = i;
           }
           candidatesMeta.push({
@@ -1384,23 +1385,21 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
         }
       }
       const pollAccountBefore = getPollAccount();
-      assert.equal(pollAccountBefore.current_poll_winner_drawn, false);
+      assert.equal(pollAccountBefore.is_winner_drawn, false);
       const now = svm.getClock();
 
       // Deadline is ahead of the current time.
-      assert(
-        pollAccountBefore.current_poll_deadline.cmp(now.unixTimestamp) == 1,
-      );
+      assert(pollAccountBefore.drop_timestamp.cmp(now.unixTimestamp) == 1);
 
       // time travelling to next second after the poll has ended.
       now.unixTimestamp = BigInt(
-        pollAccountBefore.current_poll_deadline.toNumber() + 1,
+        pollAccountBefore.drop_timestamp.toNumber() + 1,
       );
       svm.setClock(now);
 
       // We are just a second ahead of the deadline now.
       assert(
-        pollAccountBefore.current_poll_deadline.cmp(
+        pollAccountBefore.drop_timestamp.cmp(
           new anchor.BN(now.unixTimestamp),
         ) == -1,
       );
@@ -1409,9 +1408,9 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
 
       const pollAccountAfter = getPollAccount();
       assert.equal(
-        pollAccountAfter.current_poll_winner_drawn,
+        pollAccountAfter.is_winner_drawn,
         true,
-        "Poll state is not updated after drawWinner ixn.",
+        "HxuiDropTime state is not updated after drawWinner ixn.",
       );
 
       // verify the winner.
@@ -1420,9 +1419,9 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
       );
 
       // Previously active -> winner or claimable winner.
-      if (winnerCandidate.claimable_if_winner) {
+      if (winnerCandidate.claim_back_offer) {
         assert(
-          !!winnerCandidate.candidate_status.ClaimableWinner,
+          !!winnerCandidate.status.ClaimableWinner,
           "Not a claimable winner",
         );
         assert(
@@ -1434,7 +1433,7 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
           activeCandidates[expectedWinnerIndex],
         );
       } else {
-        assert(!!winnerCandidate.candidate_status.Winner, "Not a winner");
+        assert(!!winnerCandidate.status.Winner, "Not a winner");
         assert(
           !(
             expectedWinnerIndex == 3 ||
@@ -1446,10 +1445,10 @@ describe("5) Candidate creation, Voting candiate, Picking winner, Active Candida
       }
 
       assert(
-        !pollAccountAfter.current_poll_candidates.includes(
+        !pollAccountAfter.active_candidate_ids.includes(
           expectedWinnerCandidateId,
         ),
-        "Poll state still considers the winner as competing candidate",
+        "HxuiDropTime state still considers the winner as competing candidate",
       );
 
       // creating a new poll to draw more winners, only one winner per poll.
@@ -1490,22 +1489,22 @@ function checkNonActiveCandidateWith(
   const candidateState = getCandidateAccount(nonActiveCandidateName);
 
   assert(
-    !candidateState.candidate_status.Active,
+    !candidateState.status.Active,
     "An active candidate is attempted to close",
   );
 
   if (typeof expectedState.hasZeroReceipts == "boolean") {
     if (expectedState.hasZeroReceipts) {
       assert.equal(
-        candidateState.total_receipts.isZero(),
+        candidateState.receipt_count.isZero(),
         true,
-        "Candidate has non Zero receipts",
+        "HxuiCandidate has non Zero receipts",
       );
     } else {
       assert.equal(
-        candidateState.total_receipts.isZero(),
+        candidateState.receipt_count.isZero(),
         false,
-        "Candidate has Zero receipts",
+        "HxuiCandidate has Zero receipts",
       );
     }
   }
@@ -1514,25 +1513,27 @@ function checkNonActiveCandidateWith(
   switch (expectedState.while) {
     case "before":
       assert(
-        candidateState.claim_window.eq(new anchor.BN(0)),
+        candidateState.claim_deadline.eq(new anchor.BN(0)),
         "Claim window is either live or closed.",
       );
       break;
     case "during":
       assert(
-        candidateState.claim_window.cmp(new anchor.BN(now.unixTimestamp)) != -1,
+        candidateState.claim_deadline.cmp(new anchor.BN(now.unixTimestamp)) !=
+          -1,
         "Claim window is not yet started or closed",
       );
       break;
 
     case "after":
       assert.equal(
-        candidateState.claim_window.isZero(),
+        candidateState.claim_deadline.isZero(),
         false,
         "Claim window is not yet opened.",
       );
       assert(
-        candidateState.claim_window.cmp(new anchor.BN(now.unixTimestamp)) == -1,
+        candidateState.claim_deadline.cmp(new anchor.BN(now.unixTimestamp)) ==
+          -1,
         "error: Claim window is live.",
       );
       break;
@@ -1814,8 +1815,8 @@ describe("Advance candidate testing", () => {
         receiptBalanceBefore,
       );
       assert(
-        candidateStateBefore.total_receipts
-          .sub(candidateStateAfter.total_receipts)
+        candidateStateBefore.receipt_count
+          .sub(candidateStateAfter.receipt_count)
           .eq(new anchor.BN(1)),
       );
       assert.equal(hxuiTokenAccountBefore.amount, hxuiTokenAccountAfter.amount);
@@ -2011,8 +2012,8 @@ describe("Advance candidate testing", () => {
     );
 
     assert(
-      candidateStateBefore.total_receipts
-        .sub(candidateStateAfter.total_receipts)
+      candidateStateBefore.receipt_count
+        .sub(candidateStateAfter.receipt_count)
         .eq(new anchor.BN(1)),
     );
     const vaultBalanceAfter = svm.getBalance(getPda(SEEDS.hxuiVault).address);
@@ -2586,7 +2587,7 @@ function getVoteCandidateInstruction(
 function getRegisterForFreeTokensInstruction(accounts: { for: PublicKey }) {
   const data = coder.instruction.encode("register_for_free_tokens", {});
   const [mintedTimestampAddress] = PublicKey.findProgramAddressSync(
-    [Buffer.from("minted_timestamp"), accounts.for.toBuffer()],
+    [Buffer.from("free_mint_tracker"), accounts.for.toBuffer()],
     programId,
   );
 
@@ -2608,7 +2609,7 @@ function getRegisterForFreeTokensInstruction(accounts: { for: PublicKey }) {
 function getClaimRegistrationFeesInstruction(accounts: { for: PublicKey }) {
   const data = coder.instruction.encode("claim_registration_fees", {});
   const [mintedTimestampAddress] = PublicKey.findProgramAddressSync(
-    [Buffer.from("minted_timestamp"), accounts.for.toBuffer()],
+    [Buffer.from("free_mint_tracker"), accounts.for.toBuffer()],
     programId,
   );
   return new TransactionInstruction({
@@ -2628,7 +2629,7 @@ function getClaimRegistrationFeesInstruction(accounts: { for: PublicKey }) {
 function getUnregisterForFreeTokensInstruction(accounts: { for: PublicKey }) {
   const data = coder.instruction.encode("unregister_for_free_tokens", {});
   const [mintedTimestampAddress] = PublicKey.findProgramAddressSync(
-    [Buffer.from("minted_timestamp"), accounts.for.toBuffer()],
+    [Buffer.from("free_mint_tracker"), accounts.for.toBuffer()],
     programId,
   );
   return new TransactionInstruction({
@@ -2648,7 +2649,7 @@ function getMintFreeTokensInstruction(accounts: { to: PublicKey }) {
   const tokenAddress = getHxuiLiteTokenAddress(accounts.to);
 
   const [mintedTimestampAddress] = PublicKey.findProgramAddressSync(
-    [Buffer.from("minted_timestamp"), accounts.to.toBuffer()],
+    [Buffer.from("free_mint_tracker"), accounts.to.toBuffer()],
     programId,
   );
 
@@ -2772,7 +2773,7 @@ function getCreateCandidateInstruction(
   instructionArgs: {
     name: string;
     description: string;
-    claimable_if_winner: boolean;
+    claim_back_offer: boolean;
   },
 ) {
   const data = coder.instruction.encode("create_candidate", instructionArgs);
@@ -2848,7 +2849,7 @@ function getFreeTokensCounterAccount() {
   const address = getPda(SEEDS.hxuiFreeTokensCounter).address;
   const accountInfo = svm.getAccount(address);
   const accountData = coder.accounts.decode(
-    "FreeTokensCounter",
+    "HxuiFreeMintCounter",
     Buffer.from(accountInfo.data),
   );
   return accountData;
@@ -2877,11 +2878,17 @@ function assertTxFailedWithErrorCode(
 
 function getPollAccount() {
   const pollAccountInfo = svm.getAccount(getPda(SEEDS.hxuiPoll).address);
-  return coder.accounts.decode("Poll", Buffer.from(pollAccountInfo.data));
+  return coder.accounts.decode(
+    "HxuiDropTime",
+    Buffer.from(pollAccountInfo.data),
+  );
 }
 function getConfigAccount() {
   const configAccountInfo = svm.getAccount(getPda(SEEDS.hxuiConfig).address);
-  return coder.accounts.decode("Config", Buffer.from(configAccountInfo.data));
+  return coder.accounts.decode(
+    "HxuiConfig",
+    Buffer.from(configAccountInfo.data),
+  );
 }
 
 function getCandidatePda(name: string) {
@@ -2895,7 +2902,7 @@ function getCandidateAccount(name: string) {
   const candidateAddress = getCandidatePda(name).address;
   const candidateAccountInfo = svm.getAccount(candidateAddress);
   return coder.accounts.decode(
-    "Candidate",
+    "HxuiCandidate",
     Buffer.from(candidateAccountInfo.data),
   );
 }

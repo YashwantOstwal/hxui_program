@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{Candidate,CustomError,Poll, CandidateStatus};
+use crate::{HxuiCandidate,CustomError,HxuiDropTime, CandidateStatus};
 
 #[derive(Accounts)]
 #[instruction(name:String)]
@@ -12,26 +12,26 @@ pub struct WithdrawCandidate<'info>{
         mut,
         seeds = [b"hxui_candidate",name.as_bytes()],
         bump = hxui_candidate.bump,
-        constraint = hxui_candidate.candidate_status == CandidateStatus::Active @ CustomError::OnlyActiveCandidateCanBeWithdrawn,
+        constraint = hxui_candidate.status == CandidateStatus::Active @ CustomError::OnlyActiveCandidateCanBeWithdrawn,
     )]
-    pub hxui_candidate:Account<'info,Candidate>,
+    pub hxui_candidate:Account<'info,HxuiCandidate>,
 
         #[account(
         mut,
-        seeds = [b"hxui_poll"],
-        bump = hxui_poll.bump,
+        seeds = [b"hxui_drop_time"],
+        bump = hxui_drop_time.bump,
     )]
-    pub hxui_poll:Account<'info,Poll>,
+    pub hxui_drop_time:Account<'info,HxuiDropTime>,
 
 }
 
 pub fn stop_candidate(ctx:Context<WithdrawCandidate>)->Result<()>{
     let candidate = &mut ctx.accounts.hxui_candidate;
-    candidate.candidate_status = CandidateStatus::Withdrawn;
+    candidate.status = CandidateStatus::Withdrawn;
 
-    let poll = &mut ctx.accounts.hxui_poll;
-  if let Some(index) = poll.current_poll_candidates.iter().position(|&id| id == candidate.id){
-    poll.current_poll_candidates.remove(index);
+    let poll = &mut ctx.accounts.hxui_drop_time;
+  if let Some(index) = poll.active_candidate_ids.iter().position(|&id| id == candidate.id){
+    poll.active_candidate_ids.remove(index);
   }
     Ok(())
 }
