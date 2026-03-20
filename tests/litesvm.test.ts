@@ -109,9 +109,9 @@ function getHxuiLiteTokenAddress(owner: PublicKey) {
   );
 }
 const liteAuthority = new Keypair();
-describe("1) initialise_dapp instruction testing", () => {
+describe("1) init_dui instruction testing", () => {
   it("1.1) Inits the config account!", () => {
-    const data = coder.instruction.encode("initialise_dapp", {
+    const data = coder.instruction.encode("init_dui", {
       price_per_token,
       tokens_per_vote,
       free_tokens_per_mint,
@@ -191,7 +191,7 @@ describe("1) initialise_dapp instruction testing", () => {
   });
   it("1.2) Init fails for successive invocations", () => {
     //init fails after invoked once.
-    const data = coder.instruction.encode("initialise_dapp", {
+    const data = coder.instruction.encode("init_dui", {
       price_per_token,
       tokens_per_vote,
       free_tokens_per_mint,
@@ -296,7 +296,7 @@ describe("2) HxuiDropTime creation testing", () => {
     const poll_deadline = new anchor.BN(now.unixTimestamp + BigInt(86400 * 7)); // 1 week from now.
     // const adminBalanceBefore = svm.getBalance(adminPubkey);
 
-    const data = coder.instruction.encode("create_poll", {
+    const data = coder.instruction.encode("set_drop_time", {
       poll_deadline,
     });
 
@@ -381,7 +381,7 @@ describe("2) HxuiDropTime creation testing", () => {
 
     const now = clock.unixTimestamp;
     const poll_deadline = new anchor.BN(now + BigInt(86400 * 7));
-    const data = coder.instruction.encode("create_poll", {
+    const data = coder.instruction.encode("set_drop_time", {
       poll_deadline,
     });
 
@@ -597,7 +597,7 @@ describe("4) Testing 4", () => {
   });
   it("4.9) Attempt to Claim rent after unregistering but before closable time.", async () => {
     //Closable time in this situation is last minted time + 12 hours.
-    const data = coder.instruction.encode("claim_registration_fees", {});
+    const data = coder.instruction.encode("claim_registration_deposit", {});
     const ix = new TransactionInstruction({
       programId,
       keys: [
@@ -618,7 +618,7 @@ describe("4) Testing 4", () => {
 
   it("4.10) Cancel unregister", async () => {
     const data = coder.instruction.encode(
-      "cancel_unregister_for_free_tokens",
+      "cancel_deregister_from_free_mint",
       {},
     );
     const ix = new TransactionInstruction({
@@ -1587,7 +1587,7 @@ describe("Advance candidate testing", () => {
     instructionArgs: { candidateName: string },
   ) {
     const { candidateName: _name } = instructionArgs;
-    const data = coder.instruction.encode("claim_tokens", { _name });
+    const data = coder.instruction.encode("claim_back_tokens", { _name });
     return new TransactionInstruction({
       programId,
       keys: [
@@ -1718,7 +1718,7 @@ describe("Advance candidate testing", () => {
     instructionArgs: { candidateName: string },
   ) {
     const { candidateName: _name } = instructionArgs;
-    const data = coder.instruction.encode("clear_receipt", { _name });
+    const data = coder.instruction.encode("close_vote_receipt", { _name });
     return new TransactionInstruction({
       programId,
       keys: [
@@ -1901,7 +1901,7 @@ describe("Advance candidate testing", () => {
     until: anchor.BN;
   }) {
     const { nonActiveCandidateName: _name, until } = instructionArgs;
-    const data = coder.instruction.encode("open_claimable_window", {
+    const data = coder.instruction.encode("open_claim_back_window", {
       _name,
       until,
     });
@@ -2372,7 +2372,7 @@ function getSafeWithdrawlFromVaultInstruction(
   } = { amount: null },
 ) {
   const { amount } = instructionArgs;
-  const data = coder.instruction.encode("safe_withdraw_from_vault", { amount });
+  const data = coder.instruction.encode("withdraw_vault_funds", { amount });
   return new TransactionInstruction({
     programId,
     keys: [
@@ -2407,7 +2407,7 @@ function getCreatePollInstruction(instructionArgs: {
   pollDeadline: anchor.BN;
 }) {
   const { pollDeadline: poll_deadline } = instructionArgs;
-  const data = coder.instruction.encode("create_poll", {
+  const data = coder.instruction.encode("set_drop_time", {
     poll_deadline,
   });
   return new TransactionInstruction({
@@ -2541,7 +2541,7 @@ function getVoteCandidateInstruction(
   const { candidateName: name, votes } = instructionArgs;
 
   const candidateAddress = getCandidatePda(name).address;
-  const data = coder.instruction.encode("vote_candidate", {
+  const data = coder.instruction.encode("vote_with_hxui", {
     name,
     votes,
   });
@@ -2620,7 +2620,7 @@ function getRegisterForFreeTokensInstruction(accounts: { for: PublicKey }) {
 }
 
 function getClaimRegistrationFeesInstruction(accounts: { for: PublicKey }) {
-  const data = coder.instruction.encode("claim_registration_fees", {});
+  const data = coder.instruction.encode("claim_registration_deposit", {});
   const [mintedTimestampAddress] = PublicKey.findProgramAddressSync(
     [Buffer.from("free_mint_tracker"), accounts.for.toBuffer()],
     programId,
@@ -2640,7 +2640,7 @@ function getClaimRegistrationFeesInstruction(accounts: { for: PublicKey }) {
 }
 
 function getUnregisterForFreeTokensInstruction(accounts: { for: PublicKey }) {
-  const data = coder.instruction.encode("unregister_for_free_tokens", {});
+  const data = coder.instruction.encode("deregister_from_free_mint", {});
   const [mintedTimestampAddress] = PublicKey.findProgramAddressSync(
     [Buffer.from("free_mint_tracker"), accounts.for.toBuffer()],
     programId,
@@ -2733,7 +2733,7 @@ function getBuyPaidTokensInstruction(
     false,
     TOKEN_2022_PROGRAM_ID,
   );
-  const data = coder.instruction.encode("buy_paid_tokens", instructionArgs);
+  const data = coder.instruction.encode("buy_tokens", instructionArgs);
   return new TransactionInstruction({
     programId,
     keys: [
@@ -2766,7 +2766,7 @@ function getClaimbackOfferInstruction(instructionArgs: {
   candidateName: string;
 }) {
   const { candidateName: _name } = instructionArgs;
-  const data = coder.instruction.encode("set_claim_back_offer", {
+  const data = coder.instruction.encode("enable_claim_back_offer", {
     _name,
   });
   return new TransactionInstruction({
@@ -2930,10 +2930,7 @@ function getVoteCandidateWithHxuiLiteInstruction(
   accounts: Record<"owner", PublicKey>,
   instructionArgs: { _name: string; votes: anchor.BN },
 ) {
-  const data = coder.instruction.encode(
-    "vote_candidate_with_hxui_lite",
-    instructionArgs,
-  );
+  const data = coder.instruction.encode("vote_with_hxui_lite", instructionArgs);
 
   const tokenAddress = getHxuiLiteTokenAddress(accounts.owner);
   const mintAddress = getPda(SEEDS.hxuiLiteMint).address;

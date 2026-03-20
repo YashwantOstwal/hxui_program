@@ -84,7 +84,7 @@ describe("Crank script testing. ~40 secs.", () => {
     const freeMintsPerEpoch = new anchor.BN(100);
     const freeMintCoolDown = new anchor.BN(43200);
     await program.methods
-      .initialiseDapp(
+      .initDui(
         pricePerToken,
         tokensPerVote,
         freetokensPerMint,
@@ -110,7 +110,7 @@ describe("Crank script testing. ~40 secs.", () => {
       const now = await getBlockTime();
       const pollEndsAt = new BN(now + 2);
       await program.methods
-        .createPoll(pollEndsAt)
+        .setDropTime(pollEndsAt)
         .accounts({
           admin: admin.publicKey,
         })
@@ -128,14 +128,14 @@ describe("Crank script testing. ~40 secs.", () => {
         // Buying enough tokens to vote.
         const numberOfTokens = voteCount.mul(tokensPerVote);
         await program.methods
-          .buyPaidTokens(numberOfTokens)
+          .buyTokens(numberOfTokens)
           .accounts({
             owner: voters[j].publicKey,
           })
           .signers([voters[j]])
           .rpc();
         await program.methods
-          .voteCandidate(candidateNames[i], voteCount)
+          .voteWithHxui(candidateNames[i], voteCount)
           .accounts({ owner: voters[j].publicKey })
           .signers([voters[j]])
           .rpc();
@@ -200,7 +200,7 @@ describe("Crank script testing. ~40 secs.", () => {
     const clearIxs: TransactionInstruction[] = [];
     for (let i = 0; i < voteReceiptsForCandidate1.length; i++) {
       const clearIx = await program.methods
-        .clearReceipt(candidateNames[0])
+        .closeVoteReceipt(candidateNames[0])
         .accounts({
           // @ts-ignore
           admin: admin.publicKey,

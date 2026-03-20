@@ -16,7 +16,7 @@ pub mod hxui {
 
     use super::*;
 
-    pub fn initialise_dapp(ctx:Context<InitDui>,price_per_token:u64,tokens_per_vote:u64,
+    pub fn init_dui(ctx:Context<InitDui>,price_per_token:u64,tokens_per_vote:u64,
          free_tokens_per_mint:u64,
      free_mints_per_epoch:u64,
      free_mint_cool_down:i64,)->Result<()>{
@@ -30,7 +30,7 @@ pub mod hxui {
         
     }
 
-    pub fn create_poll(ctx:Context<SetDropTime>,poll_deadline:i64)->Result<()>{
+    pub fn set_drop_time(ctx:Context<SetDropTime>,poll_deadline:i64)->Result<()>{
         instructions::set_drop_time::process_set_drop_time(ctx, poll_deadline)
     }
 
@@ -42,15 +42,15 @@ pub fn draw_winner<'info>(ctx:Context<'_, '_, 'info, 'info,DrawWinner<'_>>)->Res
         instructions::register_for_free_mint::process_register_for_free_mint(ctx)
     }  
 
-    pub fn unregister_for_free_tokens(ctx:Context<DeregisterFromFreeMint>)->Result<()>{
+    pub fn deregister_from_free_mint(ctx:Context<DeregisterFromFreeMint>)->Result<()>{
         instructions::deregister_from_free_mint::process_deregister_from_free_mint(ctx)
     }
 
-pub fn cancel_unregister_for_free_tokens(ctx: Context<CancelDeregisterFromFreeMint>) -> Result<()> {
+pub fn cancel_deregister_from_free_mint(ctx: Context<CancelDeregisterFromFreeMint>) -> Result<()> {
     instructions::cancel_deregister_from_free_mint::process_cancel_deregister_from_free_mint(ctx)
 }
 
-pub fn claim_registration_fees(ctx: Context<ClaimRegistrationDeposit>) -> Result<()> {
+pub fn claim_registration_deposit(ctx: Context<ClaimRegistrationDeposit>) -> Result<()> {
     instructions::claim_registration_deposit::process_claim_registration_deposit(ctx)
 }
 
@@ -66,7 +66,7 @@ pub fn claim_registration_fees(ctx: Context<ClaimRegistrationDeposit>) -> Result
 pub fn close_candidate(ctx: Context<CloseCandidate>, _name: String) -> Result<()> {
     instructions::close_candidate::process_close_candidate(ctx)
 }
-    pub fn open_claimable_window(
+    pub fn open_claim_back_window(
     ctx: Context<OpenClaimBackWindow>,
     _name: String,
     until: i64
@@ -74,18 +74,18 @@ pub fn close_candidate(ctx: Context<CloseCandidate>, _name: String) -> Result<()
     instructions::open_claim_back_window::process_open_claim_back_window(ctx, _name, until)
 }
 
-     pub fn buy_paid_tokens(ctx:Context<BuyTokens>,amount:u64)->Result<()>{
+     pub fn buy_tokens(ctx:Context<BuyTokens>,amount:u64)->Result<()>{
         instructions::buy_tokens::process_buy_tokens(ctx,amount)
     }
 
-    pub fn safe_withdraw_from_vault(ctx:Context<WithdrawVaultFunds>,amount:Option<u64>)->Result<()>{
+    pub fn withdraw_vault_funds(ctx:Context<WithdrawVaultFunds>,amount:Option<u64>)->Result<()>{
         instructions::withdraw_vault_funds::process_withdraw_vault_funds(ctx,amount)
     }
-    pub fn vote_candidate(ctx:Context<VoteWithHxui>,name:String,votes:u64)->Result<()>{
+    pub fn vote_with_hxui(ctx:Context<VoteWithHxui>,name:String,votes:u64)->Result<()>{
         instructions::vote_with_hxui::process_vote_with_hxui(ctx,name,votes)
     }
 
-    pub fn vote_candidate_with_hxui_lite(ctx:Context<VoteWithHxuiLite>,_name:String,votes:u64)->Result<()>{
+    pub fn vote_with_hxui_lite(ctx:Context<VoteWithHxuiLite>,_name:String,votes:u64)->Result<()>{
         instructions::vote_with_hxui_lite::process_vote_with_hxui_lite(ctx,votes)
     }
     
@@ -93,16 +93,16 @@ pub fn close_candidate(ctx: Context<CloseCandidate>, _name: String) -> Result<()
         instructions::withdraw_candidate::process_withdraw_candidate(ctx)
     }
     
-pub fn claim_tokens(ctx: Context<ClaimBackTokens>, _name: String) -> Result<()> {
+pub fn claim_back_tokens(ctx: Context<ClaimBackTokens>, _name: String) -> Result<()> {
     instructions::claim_back_tokens::process_claim_back_tokens(ctx)
 }
 
 
-pub fn clear_receipt(ctx: Context<CloseVoteReceipt>, _name: String) -> Result<()> {
+pub fn close_vote_receipt(ctx: Context<CloseVoteReceipt>, _name: String) -> Result<()> {
     instructions::close_vote_receipt::process_close_vote_receipt(ctx)
 }
 
-    pub fn set_claim_back_offer(ctx:Context<EnableClaimBackOffer>,_name:String)->Result<()>{
+    pub fn enable_claim_back_offer(ctx:Context<EnableClaimBackOffer>,_name:String)->Result<()>{
         instructions::enable_claim_back_offer::process_enable_claim_back_offer(ctx)
     }
     pub fn update_config(ctx:Context<UpdateConfig>,price_per_token:Option<u64>,tokens_per_vote:Option<u64>)->Result<()>{

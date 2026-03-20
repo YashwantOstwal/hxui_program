@@ -144,7 +144,7 @@ const [pollAddress, pollBump] = PublicKey.findProgramAddressSync(
 const pricePerToken = new BN(0.001 * LAMPORTS_PER_SOL);
 const tokensPerVote = new BN(2);
 
-describe("1) initialise_dapp instruction testing", () => {
+describe("1) init_dui instruction testing", () => {
   before(async () => {
     await airdrop(adminPubkey, 4 * LAMPORTS_PER_SOL);
   });
