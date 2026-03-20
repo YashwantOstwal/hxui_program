@@ -30,8 +30,8 @@ pub mod hxui {
         
     }
 
-    pub fn set_drop_time(ctx:Context<SetDropTime>,poll_deadline:i64)->Result<()>{
-        instructions::set_drop_time::process_set_drop_time(ctx, poll_deadline)
+    pub fn set_drop_time(ctx:Context<SetDropTime>,new_drop_time:i64)->Result<()>{
+        instructions::set_drop_time::process_set_drop_time(ctx, new_drop_time)
     }
 
 pub fn draw_winner<'info>(ctx:Context<'_, '_, 'info, 'info,DrawWinner<'_>>)->Result<()>{
@@ -59,9 +59,9 @@ pub fn claim_registration_deposit(ctx: Context<ClaimRegistrationDeposit>) -> Res
     }
     
     pub fn create_candidate(ctx:Context<CreateCandidate>,name:String,description:String,
-    claim_back_offer:bool)->Result<()>{
+    enable_claim_back_offer:bool)->Result<()>{
         instructions::create_candidate::process_create_candidate(ctx,name,description,
-        claim_back_offer)
+        enable_claim_back_offer)
     }
 pub fn close_candidate(ctx: Context<CloseCandidate>, _name: String) -> Result<()> {
     instructions::close_candidate::process_close_candidate(ctx)

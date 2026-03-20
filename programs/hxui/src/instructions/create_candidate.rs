@@ -40,12 +40,12 @@ pub struct CreateCandidate<'info>{
 }
 
 
-pub fn process_create_candidate(ctx:Context<CreateCandidate>,name:String,description:String,claim_back_offer:bool)->Result<()>{
+pub fn process_create_candidate(ctx:Context<CreateCandidate>,name:String,description:String,enable_claim_back_offer:bool)->Result<()>{
     let hxui_candidate  = &mut ctx.accounts.hxui_candidate;
     let hxui_drop_time = &mut ctx.accounts.hxui_drop_time;
     let id = hxui_drop_time.total_candidate_count;
 
-    hxui_candidate.set_inner(HxuiCandidate { name, description, vote_count: 0,claim_back_offer, status:CandidateStatus::Active, bump: ctx.bumps.hxui_candidate,claim_deadline:0,id,receipt_count:0 });
+    hxui_candidate.set_inner(HxuiCandidate { name, description, vote_count: 0,claim_back_offer:enable_claim_back_offer, status:CandidateStatus::Active, bump: ctx.bumps.hxui_candidate,claim_deadline:0,id,receipt_count:0 });
     
     hxui_drop_time.active_candidate_ids.push(id);
     hxui_drop_time.total_candidate_count +=1;

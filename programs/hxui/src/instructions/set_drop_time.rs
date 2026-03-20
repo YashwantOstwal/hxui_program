@@ -24,7 +24,7 @@ pub struct SetDropTime<'info> {
     pub system_program: Program<'info, System>
 }
 
-pub fn process_set_drop_time(ctx: Context<SetDropTime>, new_deadline: i64) -> Result<()> {
+pub fn process_set_drop_time(ctx: Context<SetDropTime>, new_drop_time: i64) -> Result<()> {
     let hxui_drop_time = &mut ctx.accounts.hxui_drop_time;
     let clock: Clock = Clock::get()?;
     
@@ -33,9 +33,9 @@ pub fn process_set_drop_time(ctx: Context<SetDropTime>, new_deadline: i64) -> Re
         require!(hxui_drop_time.is_winner_drawn, CustomError::PendingWinnerDraw);
     }
     
-    require!(new_deadline > clock.unix_timestamp, CustomError::InvalidDropTime);
+    require!(new_drop_time > clock.unix_timestamp, CustomError::InvalidDropTime);
     
-    hxui_drop_time.drop_timestamp = new_deadline;
+    hxui_drop_time.drop_timestamp = new_drop_time;
     hxui_drop_time.is_winner_drawn = false;
     
     Ok(())

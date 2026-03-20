@@ -293,11 +293,11 @@ describe("1) init_dui instruction testing", () => {
 describe("2) HxuiDropTime creation testing", () => {
   it("2.1) Creating a Genesis poll with valid deadline.", () => {
     const now = svm.getClock();
-    const poll_deadline = new anchor.BN(now.unixTimestamp + BigInt(86400 * 7)); // 1 week from now.
+    const new_drop_time = new anchor.BN(now.unixTimestamp + BigInt(86400 * 7)); // 1 week from now.
     // const adminBalanceBefore = svm.getBalance(adminPubkey);
 
     const data = coder.instruction.encode("set_drop_time", {
-      poll_deadline,
+      new_drop_time,
     });
 
     const ix = new TransactionInstruction({
@@ -327,7 +327,7 @@ describe("2) HxuiDropTime creation testing", () => {
 
     const pollAccountData = getPollAccount();
 
-    assert(pollAccountData.drop_timestamp.eq(poll_deadline));
+    assert(pollAccountData.drop_timestamp.eq(new_drop_time));
     assert.equal(pollAccountData.is_winner_drawn, false);
     assert.equal(pollAccountData.total_candidate_count, 0);
     assert.equal(pollAccountData.active_candidate_ids.length, 0);
@@ -1021,7 +1021,7 @@ describe("5) HxuiCandidate creation, Voting candiate, Picking winner, Active Hxu
       {
         name: candidateName,
         description: candidateDescription,
-        claim_back_offer: false,
+        enable_claim_back_offer: false,
       },
     );
     sendTransaction([ix], [admin]);
@@ -1076,7 +1076,7 @@ describe("5) HxuiCandidate creation, Voting candiate, Picking winner, Active Hxu
         {
           name,
           description,
-          claim_back_offer: i == 3 || i == 4 || i == 5,
+          enable_claim_back_offer: i == 3 || i == 4 || i == 5,
         },
       );
       sendTransaction([ix], [admin]);
@@ -2406,9 +2406,9 @@ function getSafeWithdrawlFromVaultInstruction(
 function getCreatePollInstruction(instructionArgs: {
   pollDeadline: anchor.BN;
 }) {
-  const { pollDeadline: poll_deadline } = instructionArgs;
+  const { pollDeadline: new_drop_time } = instructionArgs;
   const data = coder.instruction.encode("set_drop_time", {
-    poll_deadline,
+    new_drop_time,
   });
   return new TransactionInstruction({
     programId,
@@ -2792,7 +2792,7 @@ function getCreateCandidateInstruction(
   instructionArgs: {
     name: string;
     description: string;
-    claim_back_offer: boolean;
+    enable_claim_back_offer: boolean;
   },
 ) {
   const data = coder.instruction.encode("create_candidate", instructionArgs);
