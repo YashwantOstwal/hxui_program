@@ -81,13 +81,14 @@ pub fn process_init_dui(
 ctx:Context<InitDui>,price_per_token:u64,tokens_per_vote:u64,
          free_tokens_per_mint:u64,
      free_mints_per_epoch:u64,
-     free_mint_cool_down:i64,)->Result<()>{
+     free_mint_cool_down:i64,
+    min_votes_to_win:u64)->Result<()>{
          let hxui_drop_time = &mut ctx.accounts.hxui_drop_time;
          hxui_drop_time.bump = ctx.bumps.hxui_drop_time;
          let rent = Rent::get()?;
          require!(tokens_per_vote * price_per_token >= rent.minimum_balance(VoteReceipt::INIT_SPACE) ,CustomError::TokenPriceNotSufficient);
          let hxui_config = &mut ctx.accounts.hxui_config;
-    hxui_config.set_inner(HxuiConfig { admin: ctx.accounts.admin.key(), price_per_token, tokens_per_vote, free_tokens_per_mint, free_mints_per_epoch, free_mint_cool_down, bump: ctx.bumps.hxui_config } );
+    hxui_config.set_inner(HxuiConfig { admin: ctx.accounts.admin.key(), price_per_token, tokens_per_vote, free_tokens_per_mint, free_mints_per_epoch, free_mint_cool_down, bump: ctx.bumps.hxui_config,min_votes_to_win } );
 
     let hxui_free_mint_counter = &mut ctx.accounts.hxui_free_mint_counter;
     hxui_free_mint_counter.bump = ctx.bumps.hxui_free_mint_counter;

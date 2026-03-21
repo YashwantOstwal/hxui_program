@@ -9,5 +9,6 @@ pub struct HxuiConfig{
     pub free_tokens_per_mint:u64,
     pub free_mints_per_epoch:u64,
     pub free_mint_cool_down:i64,
+    pub min_votes_to_win:u64,
     pub bump: u8
 }

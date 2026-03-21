@@ -83,6 +83,7 @@ describe("Crank script testing. ~40 secs.", () => {
     const freetokensPerMint = new anchor.BN(1);
     const freeMintsPerEpoch = new anchor.BN(100);
     const freeMintCoolDown = new anchor.BN(43200);
+    const minVotesToWin = new anchor.BN(10);
     await program.methods
       .initDui(
         pricePerToken,
@@ -90,6 +91,7 @@ describe("Crank script testing. ~40 secs.", () => {
         freetokensPerMint,
         freeMintsPerEpoch,
         freeMintCoolDown,
+        minVotesToWin,
       )
       .accounts({
         admin: admin.publicKey,

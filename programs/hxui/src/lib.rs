@@ -10,7 +10,7 @@ pub use states::*;
 pub use constants::*;
 pub use errors::*;
 
-declare_id!("6jVyroPEKqPgGv7uaHZpQ3Enqriyy1MXG7pcdLTud3mP");
+declare_id!("FrcnG1KDPhPqcVaAeLu6DiB5FvZBvvqqxNn5KR8wMBct");
 #[program]
 pub mod hxui {
 
@@ -19,13 +19,15 @@ pub mod hxui {
     pub fn init_dui(ctx:Context<InitDui>,price_per_token:u64,tokens_per_vote:u64,
          free_tokens_per_mint:u64,
      free_mints_per_epoch:u64,
-     free_mint_cool_down:i64,)->Result<()>{
+     free_mint_cool_down:i64,
+    min_votes_to_win:u64)->Result<()>{
         instructions::init_dui::process_init_dui(
             ctx,
             price_per_token,tokens_per_vote,
          free_tokens_per_mint,
      free_mints_per_epoch,
      free_mint_cool_down,
+     min_votes_to_win
         )
         
     }

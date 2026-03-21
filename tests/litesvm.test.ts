@@ -42,6 +42,8 @@ const tokens_per_vote = new anchor.BN(2);
 const free_tokens_per_mint = new anchor.BN(1);
 const free_mints_per_epoch = new anchor.BN(100);
 const free_mint_cool_down = new anchor.BN(43200);
+const min_votes_to_win = new anchor.BN(10);
+
 const hxui_metadata = {
   name: "100xui",
   symbol: "HXUI",
@@ -117,6 +119,7 @@ describe("1) init_dui instruction testing", () => {
       free_tokens_per_mint,
       free_mints_per_epoch,
       free_mint_cool_down,
+      min_votes_to_win,
     });
     const ix = new TransactionInstruction({
       programId,
@@ -178,9 +181,10 @@ describe("1) init_dui instruction testing", () => {
     assert(hxuiConfigData.admin.equals(adminPubkey));
     assert(hxuiConfigData.tokens_per_vote.eq(tokens_per_vote));
     assert(hxuiConfigData.price_per_token.eq(price_per_token));
-    // assert(hxuiConfigData.free_tokens_per_mint.eq(free_tokens_per_mint));
-    // assert(hxuiConfigData.free_mints_per_epoch.eq(free_mints_per_epoch));
-    // assert(hxuiConfigData.free_mint_cool_down.eq(price_per_token));
+    assert(hxuiConfigData.free_tokens_per_mint.eq(free_tokens_per_mint));
+    assert(hxuiConfigData.free_mints_per_epoch.eq(free_mints_per_epoch));
+    assert(hxuiConfigData.free_mint_cool_down.eq(free_mint_cool_down));
+    assert(hxuiConfigData.min_votes_to_win.eq(min_votes_to_win));
 
     assert.equal(hxuiConfigData.bump, getPda(SEEDS.hxuiConfig).bump);
 
@@ -197,6 +201,7 @@ describe("1) init_dui instruction testing", () => {
       free_tokens_per_mint,
       free_mints_per_epoch,
       free_mint_cool_down,
+      min_votes_to_win,
     });
     const ix = new TransactionInstruction({
       programId,
@@ -1366,6 +1371,7 @@ describe("5) HxuiCandidate creation, Voting candiate, Picking winner, Active Hxu
   // activeCandidateVotesWithReceipts = [1(0),12(1),25(1),10(0),12(1),24(1),10(0),12(1)]
 
   it("5.5) Picking 5 winners (all the 5 left active candidates) immediately after the end of each poll by time travelling.", async () => {
+    const configAccount = getConfigAccount();
     for (let i = 0; i < 5; i++) {
       let expectedWinnerCandidateId: number;
       let maxVotes: anchor.BN = new anchor.BN(0);
@@ -1378,7 +1384,7 @@ describe("5) HxuiCandidate creation, Voting candiate, Picking winner, Active Hxu
         const candidateAccount = getCandidateAccount(activeCandidates[i].name);
         if (
           candidateAccount.status.Active &&
-          candidateAccount.vote_count.cmp(new anchor.BN(10)) !== -1
+          candidateAccount.vote_count.cmp(configAccount.min_votes_to_win) !== -1
         ) {
           if (
             expectedWinnerCandidateId == undefined ||

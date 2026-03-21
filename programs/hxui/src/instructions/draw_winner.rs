@@ -57,7 +57,8 @@ pub fn process_draw_winner<'info>(ctx:Context<'_, '_, 'info, 'info,DrawWinner<'_
         }
     }
 
-    require!(candidates[winner_index].vote_count >= 10,CustomError::NotEnoughVotesForWinner); 
+    let hxui_config = &mut ctx.accounts.hxui_config;
+    require!(candidates[winner_index].vote_count >= hxui_config.min_votes_to_win,CustomError::NotEnoughVotesForWinner); 
     if candidates[winner_index].claim_back_offer {
         candidates[winner_index].status = CandidateStatus::ClaimableWinner
     }else {
