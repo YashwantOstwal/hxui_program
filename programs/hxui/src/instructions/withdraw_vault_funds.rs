@@ -12,7 +12,7 @@ pub struct WithdrawVaultFunds<'info>{
     pub admin:Signer<'info>,
 
     #[account(
-        has_one = admin @ CustomError::OnlyAdminAccess,
+        has_one = admin @ CustomError::UnauthorizedAdminAccess,
         seeds = [b"hxui_config"],
         bump = hxui_config.bump,
     )]
@@ -54,7 +54,7 @@ pub fn process_withdraw_vault_funds(ctx:Context<WithdrawVaultFunds>,amount:Optio
         }).with_signer(&signer_seeds);
         match amount{
         Some(amount)=>{
-            require!(amount<=vault_balance-minimum_vault_balance,CustomError::InsufficientFunds);
+            require!(amount<=vault_balance-minimum_vault_balance,CustomError::VaultInsufficientFunds);
             transfer(cpi_context, amount)
         },
         None=>{

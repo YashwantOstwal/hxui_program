@@ -18,10 +18,10 @@ pub struct ClaimRegistrationDeposit<'info> {
 pub fn process_claim_registration_deposit(ctx: Context<ClaimRegistrationDeposit>) -> Result<()> {
     let clock = Clock::get()?;
     let free_mint_tracker = &ctx.accounts.free_mint_tracker;
-    require!(free_mint_tracker.unregistered, CustomError::UnregisterFirst);
+    require!(free_mint_tracker.unregistered, CustomError::MustUnregisterFirst);
     require!(
         clock.unix_timestamp >= free_mint_tracker.next_mint_timestamp,
-        CustomError::UnclaimableYet
+        CustomError::FeeClaimCooldownActive
     );
     Ok(())
 }

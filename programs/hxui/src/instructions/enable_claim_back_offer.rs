@@ -18,7 +18,7 @@ pub struct EnableClaimBackOffer<'info>{
         mut,
         seeds = [b"hxui_candidate",name.as_bytes()],
         bump = hxui_candidate.bump,
-        constraint = hxui_candidate.status == CandidateStatus::Active @ CustomError::CannotSetClaimableForNonActiveCandidate,
+        constraint = hxui_candidate.status == CandidateStatus::Active @ CustomError::InactiveCandidateClaimBlocked,
 
     )]
     pub hxui_candidate:Account<'info,HxuiCandidate>

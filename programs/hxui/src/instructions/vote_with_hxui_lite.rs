@@ -31,10 +31,7 @@ pub struct VoteWithHxuiLite<'info>{
         mut,
         seeds = [b"hxui_candidate",name.as_bytes()],
         bump = hxui_candidate.bump,
-        // constraint = hxui_candidate.can_be_winner == true @ CustomError::CandidateIsNoLongerVotable
-        // constraint = hxui_candidate.is_winner == false @ CustomError::CandidateAlreadyAWinner,
-
-        constraint = hxui_candidate.status == CandidateStatus::Active @ CustomError::OnlyActiveCandidateCanBeVoted,
+        constraint = hxui_candidate.status == CandidateStatus::Active @ CustomError::InactiveCandidateVoted,
     )]
     pub hxui_candidate:Account<'info,HxuiCandidate>,
 

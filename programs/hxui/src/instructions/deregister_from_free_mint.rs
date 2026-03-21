@@ -15,7 +15,7 @@ pub struct DeregisterFromFreeMint<'info>{
 
 pub fn process_deregister_from_free_mint(ctx:Context<DeregisterFromFreeMint>)->Result<()>{
     let free_mint_tracker = &mut ctx.accounts.free_mint_tracker;
-    require!(!free_mint_tracker.unregistered,CustomError::AlreadyUnregistered);
+    require!(!free_mint_tracker.unregistered,CustomError::UserAlreadyUnregistered);
     free_mint_tracker.unregistered = true;
     Ok(())
 }

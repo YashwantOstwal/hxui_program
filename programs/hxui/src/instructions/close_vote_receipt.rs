@@ -30,7 +30,7 @@ pub struct CloseVoteReceipt<'info> {
     #[account(
         mut,
         close = hxui_vault,
-        constraint = vote_receipt.id == hxui_candidate.id @ CustomError::InvalidReceiptForCandidate
+        constraint = vote_receipt.id == hxui_candidate.id @ CustomError::ReceiptCandidateMismatch
     )]
     pub vote_receipt: Account<'info, VoteReceipt>,
 }
@@ -39,21 +39,21 @@ pub fn process_close_vote_receipt(ctx: Context<CloseVoteReceipt>) -> Result<()> 
     let hxui_candidate = &mut ctx.accounts.hxui_candidate;
 
     // This ixn can only be invoked for vote receipts of hxui_candidate whose status is winner, withdrawn or claimable winner after the withdraw window is closed.
-    // require!(hxui_candidate.status != CandidateStatus::Active,CustomError::ReceiptsCannotBeClosedForAnActiveCandidate);
+    // require!(hxui_candidate.status != CandidateStatus::Active,CustomError::CannotCloseActiveReceipts);
 
     hxui_candidate.receipt_count -= 1;
 
     match hxui_candidate.status {
         CandidateStatus::Active => {
-            err!(CustomError::ReceiptsCannotBeClosedForAnActiveCandidate)
+            err!(CustomError::CannotCloseActiveReceipts)
         },
         CandidateStatus::Winner => {
             Ok(())
         },
         _ => {
             let clock = Clock::get()?;
-            require!(hxui_candidate.claim_deadline != 0, CustomError::OpenWithdrawWindowFirst);
-            require!(clock.unix_timestamp > hxui_candidate.claim_deadline, CustomError::WaitUntilWithdrawWindowIsClosed);
+            require!(hxui_candidate.claim_deadline != 0, CustomError::ClaimBackWindowNotOpen);
+            require!(clock.unix_timestamp > hxui_candidate.claim_deadline, CustomError::ClaimBackWindowStillOpen);
             Ok(())
         }
     }

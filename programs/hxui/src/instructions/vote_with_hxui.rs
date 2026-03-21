@@ -33,7 +33,7 @@ pub struct VoteWithHxui<'info>{
         mut,
         seeds = [b"hxui_candidate",name.as_bytes()],
         bump = hxui_candidate.bump,
-        constraint = hxui_candidate.status == CandidateStatus::Active @ CustomError::OnlyActiveCandidateCanBeVoted,
+        constraint = hxui_candidate.status == CandidateStatus::Active @ CustomError::InactiveCandidateVoted,
     )]
     pub hxui_candidate:Account<'info,HxuiCandidate>,
 
@@ -66,7 +66,7 @@ pub struct VoteWithHxui<'info>{
 }
 
 pub fn process_vote_with_hxui(ctx:Context<VoteWithHxui>,name:String,votes:u64)->Result<()>{
-    require!(votes > 0,CustomError::VotesMustBeGreaterThan0);
+    require!(votes > 0,CustomError::ZeroVotesProvided);
     let hxui_candidate = &mut ctx.accounts.hxui_candidate;
     let vote_receipt = &mut ctx.accounts.vote_receipt;
     let hxui_config = & ctx.accounts.hxui_config;

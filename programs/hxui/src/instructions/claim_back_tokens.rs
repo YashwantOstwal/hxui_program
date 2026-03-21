@@ -60,12 +60,12 @@ pub fn process_claim_back_tokens(ctx: Context<ClaimBackTokens>) -> Result<()> {
 
     let is_withdrawn = hxui_candidate.status == CandidateStatus::Withdrawn;
     let is_claimable_winner = hxui_candidate.status == CandidateStatus::ClaimableWinner;
-    require!(is_withdrawn || is_claimable_winner, CustomError::TokensCannotBeClaimed);
+    require!(is_withdrawn || is_claimable_winner, CustomError::IneligibleForTokenClaim);
 
     let clock = Clock::get()?;
     require!(
         hxui_candidate.claim_deadline != 0 && clock.unix_timestamp <= hxui_candidate.claim_deadline,
-        CustomError::UnclaimableNow
+        CustomError::OutsideClaimBackWindow
     );
 
     let vote_receipt = &ctx.accounts.vote_receipt;

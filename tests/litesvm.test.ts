@@ -565,7 +565,7 @@ describe("4) Testing 4", () => {
     const ix = getClaimRegistrationFeesInstruction({ for: adminPubkey });
     const failed = sendTransaction([ix], [admin]);
 
-    assertTxFailedWithErrorCode(failed, "UnregisterFirst");
+    assertTxFailedWithErrorCode(failed, "MustUnregisterFirst");
   });
   it("4.7) Trigger Unregister for admin before cooldown ", () => {
     const ix = getUnregisterForFreeTokensInstruction({ for: adminPubkey });
@@ -598,7 +598,7 @@ describe("4) Testing 4", () => {
     const ix = getMintFreeTokensInstruction({ to: adminPubkey });
     const failed = sendTransaction([ix], [liteAuthority]);
 
-    assertTxFailedWithErrorCode(failed, "UnregisteredForFreeTokens.");
+    assertTxFailedWithErrorCode(failed, "NotRegisteredForFreeTokens.");
   });
   it("4.9) Attempt to Claim rent after unregistering but before closable time.", async () => {
     //Closable time in this situation is last minted time + 12 hours.
@@ -618,7 +618,7 @@ describe("4) Testing 4", () => {
 
     const failed = sendTransaction([ix], [admin]);
 
-    assertTxFailedWithErrorCode(failed, "UnclaimableYet.");
+    assertTxFailedWithErrorCode(failed, "FeeClaimCooldownActive.");
   });
 
   it("4.10) Cancel unregister", async () => {
@@ -756,7 +756,7 @@ describe("4) Testing 4", () => {
       );
 
       if (metadata instanceof FailedTransactionMetadata) {
-        assertTxFailedWithErrorCode(metadata, "AllFreeTokensForTheDayMinted");
+        assertTxFailedWithErrorCode(metadata, "OverallFreeMintLimitExceeded");
         // minting will fail from x+1 user if x are the tokens that can be minted.
         assert(
           i >=
@@ -1318,7 +1318,7 @@ describe("5) HxuiCandidate creation, Voting candiate, Picking winner, Active Hxu
 
     const ix = getCloseCandidateInstruction({ candidateName });
     const failed = sendTransaction([ix], [admin]);
-    assertTxFailedWithErrorCode(failed, "ActiveCandidateCannotBeClosed");
+    assertTxFailedWithErrorCode(failed, "CannotCloseActiveCandidate");
   });
 
   it("5.4 Set claimback offer for an active candidate after initialisation", () => {
@@ -1567,7 +1567,7 @@ describe("Advance candidate testing", () => {
         candidateName: nonActiveCandidateName,
       });
       const failed = sendTransaction([ix], [admin]);
-      assertTxFailedWithErrorCode(failed, "OnlyActiveCandidateCanBeWithdrawn");
+      assertTxFailedWithErrorCode(failed, "InactiveCandidateWithdrawal");
     }
     withdrawCandidate(newCandidates.winner[0].name);
     withdrawCandidate(newCandidates.claimableWinner[0].name);
@@ -1580,7 +1580,7 @@ describe("Advance candidate testing", () => {
         { _name: nonActiveCandidateName, votes: new anchor.BN(1) },
       );
       const failed = sendTransaction([ix], [users[1]]);
-      assertTxFailedWithErrorCode(failed, "OnlyActiveCandidateCanBeVoted.");
+      assertTxFailedWithErrorCode(failed, "InactiveCandidateVoted.");
     }
 
     voteANonActiveCandidate(newCandidates.winner[0].name);
@@ -1660,20 +1660,20 @@ describe("Advance candidate testing", () => {
       users[0],
       { hasZeroReceipts: false, while: "before" },
     );
-    assertTxFailedWithErrorCode(failed, "TokensCannotBeClaimed");
+    assertTxFailedWithErrorCode(failed, "IneligibleForTokenClaim");
     const failed2 = claimTokensForNonActiveCandidate(
       newCandidates.claimableWinner[1].name,
       users[0],
       { hasZeroReceipts: false, while: "before" },
     );
-    assertTxFailedWithErrorCode(failed2, "UnclaimableNow");
+    assertTxFailedWithErrorCode(failed2, "OutsideClaimBackWindow");
 
     const failed3 = claimTokensForNonActiveCandidate(
       newCandidates.withdrawn[1].name,
       users[0],
       { hasZeroReceipts: false, while: "before" },
     );
-    assertTxFailedWithErrorCode(failed3, "UnclaimableNow");
+    assertTxFailedWithErrorCode(failed3, "OutsideClaimBackWindow");
   });
 
   // newCandidates = {
@@ -1698,19 +1698,19 @@ describe("Advance candidate testing", () => {
       hasZeroReceipts: false,
       while: "before",
     });
-    assertTxFailedWithErrorCode(failed1, "CloseAllReceiptAccount");
+    assertTxFailedWithErrorCode(failed1, "PendingReceiptsExist");
 
     const failed2 = closeNonActiveCandidate(
       newCandidates.claimableWinner[1].name,
       { hasZeroReceipts: false, while: "before" },
     );
-    assertTxFailedWithErrorCode(failed2, "OpenWithdrawWindowFirst");
+    assertTxFailedWithErrorCode(failed2, "ClaimBackWindowNotOpen");
 
     const failed3 = closeNonActiveCandidate(newCandidates.withdrawn[1].name, {
       hasZeroReceipts: false,
       while: "before",
     });
-    assertTxFailedWithErrorCode(failed3, "OpenWithdrawWindowFirst");
+    assertTxFailedWithErrorCode(failed3, "ClaimBackWindowNotOpen");
   });
 
   // newCandidates = {
@@ -1846,12 +1846,12 @@ describe("Advance candidate testing", () => {
       newCandidates.claimableWinner[1].name,
       { while: "before", hasZeroReceipts: false },
     );
-    assertTxFailedWithErrorCode(failed, "OpenWithdrawWindowFirst.");
+    assertTxFailedWithErrorCode(failed, "ClaimBackWindowNotOpen.");
     const failed2 = clearReceiptForNonActiveCandidate(
       newCandidates.withdrawn[1].name,
       { while: "before", hasZeroReceipts: false },
     );
-    assertTxFailedWithErrorCode(failed2, "OpenWithdrawWindowFirst.");
+    assertTxFailedWithErrorCode(failed2, "ClaimBackWindowNotOpen.");
   });
 
   // newCandidates.winner[1] HAS 0 RECEIPTS NOW. USE IT WITH CONSIDERTION.
@@ -1949,9 +1949,9 @@ describe("Advance candidate testing", () => {
     );
     assertTxFailedWithErrorCode(
       failed,
-      "CanBeClosedImmediatelyWithoutWithdrawWindow",
+      "ZeroReceiptsImmediateClose",
       // For a winner candidate, there is no such thing like opening a withdraw window.
-      // The above error code is due to the receipt having 0 receipts otherwise it would throw "CanBeClosedImmediatelyByClearingReceipts"
+      // The above error code is due to the receipt having 0 receipts otherwise it would throw "RequiresReceiptClearance"
     );
 
     const metadata = openWithdrawWindowForNonActiveCandidate(
@@ -1978,13 +1978,13 @@ describe("Advance candidate testing", () => {
       newCandidates.claimableWinner[1].name,
       { while: "during", hasZeroReceipts: false },
     );
-    assertTxFailedWithErrorCode(failed, "WaitUntilWithdrawWindowIsClosed");
+    assertTxFailedWithErrorCode(failed, "ClaimBackWindowStillOpen");
 
     const failed2 = clearReceiptForNonActiveCandidate(
       newCandidates.withdrawn[1].name,
       { while: "during", hasZeroReceipts: false },
     );
-    assertTxFailedWithErrorCode(failed2, "WaitUntilWithdrawWindowIsClosed");
+    assertTxFailedWithErrorCode(failed2, "ClaimBackWindowStillOpen");
   });
   // NO CHANGE
   // newCandidates = {
@@ -1997,13 +1997,13 @@ describe("Advance candidate testing", () => {
       newCandidates.claimableWinner[1].name,
       { hasZeroReceipts: false, while: "during" },
     );
-    assertTxFailedWithErrorCode(failed, "WaitUntilWithdrawWindowIsClosed");
+    assertTxFailedWithErrorCode(failed, "ClaimBackWindowStillOpen");
 
     const failed2 = closeNonActiveCandidate(newCandidates.withdrawn[1].name, {
       hasZeroReceipts: false,
       while: "during",
     });
-    assertTxFailedWithErrorCode(failed2, "WaitUntilWithdrawWindowIsClosed");
+    assertTxFailedWithErrorCode(failed2, "ClaimBackWindowStillOpen");
   });
   // NO CHANGE
   // newCandidates = {
@@ -2140,14 +2140,14 @@ describe("Advance candidate testing", () => {
       users[0],
       { hasZeroReceipts: false, while: "after" },
     );
-    assertTxFailedWithErrorCode(failed, "UnclaimableNow");
+    assertTxFailedWithErrorCode(failed, "OutsideClaimBackWindow");
 
     const failed2 = claimTokensForNonActiveCandidate(
       newCandidates.withdrawn[2].name,
       users[0],
       { hasZeroReceipts: false, while: "after" },
     );
-    assertTxFailedWithErrorCode(failed2, "UnclaimableNow");
+    assertTxFailedWithErrorCode(failed2, "OutsideClaimBackWindow");
   });
   // NO CHANGE
   // newCandidates = {
@@ -2157,18 +2157,18 @@ describe("Advance candidate testing", () => {
   //   }
   it("Attempt to close a Non active candidate after a withdraw window given each non active candidate have NON ZERO receipts.", async () => {
     // Non zero receipts
-    // CloseAllReceiptAccount
+    // PendingReceiptsExist
     const failed = closeNonActiveCandidate(
       newCandidates.claimableWinner[2].name,
       { hasZeroReceipts: false, while: "after" },
     );
-    assertTxFailedWithErrorCode(failed, "CloseAllReceiptAccount");
+    assertTxFailedWithErrorCode(failed, "PendingReceiptsExist");
 
     const failed2 = closeNonActiveCandidate(
       newCandidates.claimableWinner[2].name,
       { hasZeroReceipts: false, while: "after" },
     );
-    assertTxFailedWithErrorCode(failed2, "CloseAllReceiptAccount");
+    assertTxFailedWithErrorCode(failed2, "PendingReceiptsExist");
   });
   // NO CHANGE
   // newCandidates = {
@@ -2289,7 +2289,7 @@ describe("6)Withdrawl and financing the vote receipts.", () => {
       amount: withdrawAmount,
     });
     const failed = sendTransaction([ix], [admin]);
-    assertTxFailedWithErrorCode(failed, "InsufficientFunds");
+    assertTxFailedWithErrorCode(failed, "VaultInsufficientFunds");
   });
   it("Withdraw maximum amount possible from the vault WITHOUT explicitly passing the amount.", () => {
     const vaultBalanceBefore = svm.getBalance(getPda(SEEDS.hxuiVault).address);

@@ -24,7 +24,7 @@ pub struct CreateCandidate<'info>{
         space = ANCHOR_DISCRIMINATOR + HxuiCandidate::INIT_SPACE,
         seeds = [b"hxui_candidate",name.as_bytes()],
         bump,
-        constraint = description.len() <= 280 @ CustomError::DescriptionTooLong
+        constraint = description.len() <= 280 @ CustomError::CandidateDescriptionTooLong
     )]
     pub hxui_candidate:Account<'info,HxuiCandidate>,
 

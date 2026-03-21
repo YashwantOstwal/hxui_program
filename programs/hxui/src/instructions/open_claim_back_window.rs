@@ -30,20 +30,20 @@ pub fn process_open_claim_back_window(
     let hxui_candidate = &mut ctx.accounts.hxui_candidate;
 
     if hxui_candidate.status == CandidateStatus::Active {
-        return err!(CustomError::ActiveCandidateCannotOpenWithdrawWindow);
+        return err!(CustomError::ActiveCandidateClaimBackWindowBlocked);
     } 
     
     if hxui_candidate.receipt_count == 0 {
-        return err!(CustomError::CanBeClosedImmediatelyWithoutWithdrawWindow);
+        return err!(CustomError::ZeroReceiptsImmediateClose);
     }
     
     if hxui_candidate.status == CandidateStatus::Winner {
-        return err!(CustomError::CanBeClosedImmediatelyByClearingReceipts);
+        return err!(CustomError::RequiresReceiptClearance);
     } 
     
     let clock = Clock::get()?;
 
-    require!(until > clock.unix_timestamp, CustomError::InvalidClosetime);
+    require!(until > clock.unix_timestamp, CustomError::TimestampNotInFuture);
     
     hxui_candidate.claim_deadline = until;
     

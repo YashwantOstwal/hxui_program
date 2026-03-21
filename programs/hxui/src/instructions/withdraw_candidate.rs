@@ -12,7 +12,7 @@ pub struct WithdrawCandidate<'info>{
         mut,
         seeds = [b"hxui_candidate",name.as_bytes()],
         bump = hxui_candidate.bump,
-        constraint = hxui_candidate.status == CandidateStatus::Active @ CustomError::OnlyActiveCandidateCanBeWithdrawn,
+        constraint = hxui_candidate.status == CandidateStatus::Active @ CustomError::InactiveCandidateWithdrawal,
     )]
     pub hxui_candidate:Account<'info,HxuiCandidate>,
 

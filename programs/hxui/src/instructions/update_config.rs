@@ -21,7 +21,7 @@ pub fn process_update_config(ctx: Context<UpdateConfig> ,price_per_token: Option
 
     if let Some(price_per_token) = price_per_token {
         let rent = Rent::get()?;
-         require!(hxui_config.tokens_per_vote * hxui_config.price_per_token >= rent.minimum_balance(VoteReceipt::INIT_SPACE) ,CustomError::TokenPriceNotSufficient);
+         require!(hxui_config.tokens_per_vote * hxui_config.price_per_token >= rent.minimum_balance(VoteReceipt::INIT_SPACE) ,CustomError::InvalidTokenPrice);
         hxui_config.price_per_token = price_per_token;
     }
 

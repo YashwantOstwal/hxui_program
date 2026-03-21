@@ -33,7 +33,7 @@ pub fn process_set_drop_time(ctx: Context<SetDropTime>, new_drop_time: i64) -> R
         require!(hxui_drop_time.is_winner_drawn, CustomError::PendingWinnerDraw);
     }
     
-    require!(new_drop_time > clock.unix_timestamp, CustomError::InvalidDropTime);
+    require!(new_drop_time > clock.unix_timestamp, CustomError::TimestampNotInFuture);
     
     hxui_drop_time.drop_timestamp = new_drop_time;
     hxui_drop_time.is_winner_drawn = false;

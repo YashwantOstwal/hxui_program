@@ -566,7 +566,7 @@ describe("2) HxuiDropTime creation testing", () => {
 //         errorCode: { code },
 //       },
 //     }) {
-//       assert.equal(code, "UnregisterFirst");
+//       assert.equal(code, "MustUnregisterFirst");
 //     }
 //   });
 
@@ -629,7 +629,7 @@ describe("2) HxuiDropTime creation testing", () => {
 //         errorCode: { code },
 //       },
 //     }) {
-//       assert.equal(code, "UnclaimableYet");
+//       assert.equal(code, "FeeClaimCooldownActive");
 //     }
 //   });
 
@@ -762,7 +762,7 @@ describe("2) HxuiDropTime creation testing", () => {
 //           errorCode: { code },
 //         },
 //       }) {
-//         assert.equal(code, "AllFreeTokensForTheDayMinted");
+//         assert.equal(code, "OverallFreeMintLimitExceeded");
 //         // minting will fail from x+1 user if x are the tokens that can be minted.
 //         assert(
 //           i >=
@@ -1220,7 +1220,7 @@ describe("5) HxuiCandidate creation, Voting candiate, Picking winner, Active Hxu
         errorCode: { code },
       },
     }) {
-      assert.equal(code, "ActiveCandidateCannotBeClosed");
+      assert.equal(code, "CannotCloseActiveCandidate");
     }
   });
   // users.length = 3
@@ -1407,7 +1407,7 @@ describe("Advance candidate testing", () => {
         errorCode: { code },
       },
     }) {
-      assert.strictEqual(code, "OnlyActiveCandidateCanBeWithdrawn");
+      assert.strictEqual(code, "InactiveCandidateWithdrawal");
     }
 
     try {
@@ -1421,7 +1421,7 @@ describe("Advance candidate testing", () => {
         errorCode: { code },
       },
     }) {
-      assert.strictEqual(code, "OnlyActiveCandidateCanBeWithdrawn");
+      assert.strictEqual(code, "InactiveCandidateWithdrawal");
     }
   });
   it("5.5) Cannot vote a Non active candidate (eg. Winner (candidates.winner[0]), Claimable Winner (candidates.claimableWinner[0]) or a Withdrawn (candidates.withdrawn[0])", async () => {
@@ -1439,7 +1439,7 @@ describe("Advance candidate testing", () => {
           errorCode: { code },
         },
       }) {
-        assert.equal(code, "OnlyActiveCandidateCanBeVoted");
+        assert.equal(code, "InactiveCandidateVoted");
       }
     }
 
@@ -1501,14 +1501,18 @@ describe("Advance candidate testing", () => {
     await claimTokens(
       newCandidates.winner[1],
       users[0],
-      "TokensCannotBeClaimed",
+      "IneligibleForTokenClaim",
     );
     await claimTokens(
       newCandidates.claimableWinner[1],
       users[0],
-      "UnclaimableNow",
+      "OutsideClaimBackWindow",
     );
-    await claimTokens(newCandidates.withdrawn[1], users[0], "UnclaimableNow");
+    await claimTokens(
+      newCandidates.withdrawn[1],
+      users[0],
+      "OutsideClaimBackWindow",
+    );
   });
 
   // newCandidates = {
@@ -1559,15 +1563,15 @@ describe("Advance candidate testing", () => {
     }
     await closeNonActiveCandidate(
       newCandidates.winner[1],
-      "CloseAllReceiptAccount",
+      "PendingReceiptsExist",
     );
     await closeNonActiveCandidate(
       newCandidates.claimableWinner[1],
-      "OpenWithdrawWindowFirst",
+      "ClaimBackWindowNotOpen",
     );
     await closeNonActiveCandidate(
       newCandidates.withdrawn[1],
-      "OpenWithdrawWindowFirst",
+      "ClaimBackWindowNotOpen",
     );
   });
 
@@ -1799,8 +1803,8 @@ describe("Advance candidate testing", () => {
         errorCode: { code },
       },
     }) {
-      assert.equal(code, "CanBeClosedImmediatelyWithoutWithdrawWindow");
-      // Ideally should throw "CanBeClosedImmediatelyByClearingReceipts"..The enchountered error is due to 0 receipts.
+      assert.equal(code, "ZeroReceiptsImmediateClose");
+      // Ideally should throw "RequiresReceiptClearance"..The enchountered error is due to 0 receipts.
     }
     for (const candidateName of [
       newCandidates.withdrawn[1].name,
@@ -1894,14 +1898,14 @@ describe("Advance candidate testing", () => {
       assert(false);
     } catch (err) {
       assert(true);
-      // "WaitUntilWithdrawWindowIsClosed. verified
+      // "ClaimBackWindowStillOpen. verified
     }
     try {
       await clearReceiptForNonActiveCandidate(newCandidates.withdrawn[1]);
       assert(false);
     } catch (err) {
       assert(true);
-      // "WaitUntilWithdrawWindowIsClosed. verified
+      // "ClaimBackWindowStillOpen. verified
     }
   });
   // newCandidates = {
@@ -1952,11 +1956,11 @@ describe("Advance candidate testing", () => {
 
     await closeNonActiveCandidate(
       newCandidates.claimableWinner[1],
-      "WaitUntilWithdrawWindowIsClosed",
+      "ClaimBackWindowStillOpen",
     );
     await closeNonActiveCandidate(
       newCandidates.withdrawn[1],
-      "WaitUntilWithdrawWindowIsClosed",
+      "ClaimBackWindowStillOpen",
     );
   });
 
@@ -2194,9 +2198,13 @@ describe("Advance candidate testing", () => {
     await claimTokens(
       newCandidates.claimableWinner[2],
       users[0], // claimed by
-      "UnclaimableNow",
+      "OutsideClaimBackWindow",
     );
-    await claimTokens(newCandidates.withdrawn[2], users[0], "UnclaimableNow");
+    await claimTokens(
+      newCandidates.withdrawn[2],
+      users[0],
+      "OutsideClaimBackWindow",
+    );
   });
   // No change.
   // newCandidates = {
@@ -2219,7 +2227,7 @@ describe("Advance candidate testing", () => {
           errorCode: { code },
         },
       }) {
-        assert(code, "CloseAllReceiptAccount.");
+        assert(code, "PendingReceiptsExist.");
       }
     }
     await closeNonActiveCandidate(newCandidates.claimableWinner[2]);
@@ -2555,7 +2563,7 @@ describe("6)Safe withdrawl from the vault ixn testing..", () => {
 //         errorCode: { code },
 //       },
 //     }) {
-//       assert.equal(code, "InsufficientFunds");
+//       assert.equal(code, "VaultInsufficientFunds");
 //     }
 //   });
 

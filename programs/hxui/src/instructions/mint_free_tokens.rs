@@ -60,7 +60,7 @@ pub fn process_mint_free_tokens(ctx:Context<MintFreeTokens>)->Result<()>{
 
     let hxui_free_mints_counter = &mut ctx.accounts.hxui_free_mint_counter;
     let is_new_epoch = current_epoch != hxui_free_mints_counter.current_epoch;
-    require!(is_new_epoch || hxui_free_mints_counter.remaining_free_mints > 0,CustomError::AllFreeTokensForTheDayMinted);
+    require!(is_new_epoch || hxui_free_mints_counter.remaining_free_mints > 0,CustomError::OverallFreeMintLimitExceeded);
     
     let hxui_config  = &mut ctx.accounts.hxui_config;
     if is_new_epoch {
@@ -68,7 +68,7 @@ pub fn process_mint_free_tokens(ctx:Context<MintFreeTokens>)->Result<()>{
         hxui_free_mints_counter.remaining_free_mints = hxui_config.free_mints_per_epoch;
     }
     let free_mint_tracker = &mut ctx.accounts.free_mint_tracker;
-    require!(!free_mint_tracker.unregistered,CustomError::UnregisteredForFreeTokens);
+    require!(!free_mint_tracker.unregistered,CustomError::NotRegisteredForFreeTokens);
     require!(current_unix_timestamp >= free_mint_tracker.next_mint_timestamp,CustomError::MintCooldownActive);
 
     free_mint_tracker.next_mint_timestamp = current_unix_timestamp + hxui_config.free_mint_cool_down;

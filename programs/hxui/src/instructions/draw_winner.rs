@@ -24,14 +24,14 @@ pub fn process_draw_winner<'info>(ctx:Context<'_, '_, 'info, 'info,DrawWinner<'_
 
     let hxui_drop_time = &mut ctx.accounts.hxui_drop_time;
     require!(clock.unix_timestamp > hxui_drop_time.drop_timestamp,CustomError::DrawTimeNotReached);
-    require!(!hxui_drop_time.is_winner_drawn,CustomError::WinnerForCurrentPollAlreadyDrawn);
+    require!(!hxui_drop_time.is_winner_drawn,CustomError::CycleWinnerAlreadyDrawn);
 
     let mut missing_candidates = hxui_drop_time.active_candidate_ids.clone();
     let mut candidates= Vec::new();
     
     
-    require!(!missing_candidates.is_empty(),CustomError::NoCandidates); // no active candidates to pick a winner from
-    require!(!ctx.remaining_accounts.is_empty(),CustomError::PassAllActiveCandidates);
+    require!(!missing_candidates.is_empty(),CustomError::EmptyCandidatePool); // no active candidates to pick a winner from
+    require!(!ctx.remaining_accounts.is_empty(),CustomError::IncompleteActiveCandidateList);
     for account_info in ctx.remaining_accounts{
         let candidate:Account<HxuiCandidate> = Account::try_from(account_info)?;
         
@@ -45,7 +45,7 @@ pub fn process_draw_winner<'info>(ctx:Context<'_, '_, 'info, 'info,DrawWinner<'_
         }
     }
 }
-    require!(missing_candidates.is_empty(),CustomError::PassAllActiveCandidates);
+    require!(missing_candidates.is_empty(),CustomError::IncompleteActiveCandidateList);
     let mut winner_index = 0;
 
     for i in 1..candidates.len(){
@@ -58,7 +58,7 @@ pub fn process_draw_winner<'info>(ctx:Context<'_, '_, 'info, 'info,DrawWinner<'_
     }
 
     let hxui_config = &mut ctx.accounts.hxui_config;
-    require!(candidates[winner_index].vote_count >= hxui_config.min_votes_to_win,CustomError::NotEnoughVotesForWinner); 
+    require!(candidates[winner_index].vote_count >= hxui_config.min_votes_to_win,CustomError::InsufficientVotesForWinner); 
     if candidates[winner_index].claim_back_offer {
         candidates[winner_index].status = CandidateStatus::ClaimableWinner
     }else {
