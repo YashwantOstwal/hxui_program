@@ -16,20 +16,24 @@ pub mod hxui {
 
     use super::*;
 
-    pub fn init_dui(ctx:Context<InitDui>,price_per_token:u64,tokens_per_vote:u64,
-         free_tokens_per_mint:u64,
-     free_mints_per_epoch:u64,
-     free_mint_cool_down:i64,
-    min_votes_to_win:u64)->Result<()>{
+    pub fn init_dui(
+        ctx: Context<InitDui>,
+        price_per_token: u64,
+        tokens_per_vote: u64,
+        free_tokens_per_mint: u64,
+        free_mints_per_epoch: u64,
+        free_mint_cool_down: i64,
+        min_votes_to_win: u64,
+    ) -> Result<()> {
         instructions::init_dui::process_init_dui(
             ctx,
-            price_per_token,tokens_per_vote,
-         free_tokens_per_mint,
-     free_mints_per_epoch,
-     free_mint_cool_down,
-     min_votes_to_win
+            price_per_token,
+            tokens_per_vote,
+            free_tokens_per_mint,
+            free_mints_per_epoch,
+            free_mint_cool_down,
+            min_votes_to_win,
         )
-        
     }
 
     pub fn set_drop_time(ctx:Context<SetDropTime>,new_drop_time:i64)->Result<()>{
@@ -95,21 +99,22 @@ pub fn close_candidate(ctx: Context<CloseCandidate>, _name: String) -> Result<()
         instructions::withdraw_candidate::process_withdraw_candidate(ctx)
     }
     
-pub fn claim_back_tokens(ctx: Context<ClaimBackTokens>, _name: String) -> Result<()> {
-    instructions::claim_back_tokens::process_claim_back_tokens(ctx)
-}
+    pub fn claim_back_tokens(ctx: Context<ClaimBackTokens>, _name: String) -> Result<()> {
+        instructions::claim_back_tokens::process_claim_back_tokens(ctx)
+    }
 
-
-pub fn close_vote_receipt(ctx: Context<CloseVoteReceipt>, _name: String) -> Result<()> {
-    instructions::close_vote_receipt::process_close_vote_receipt(ctx)
-}
+    pub fn close_vote_receipt(ctx: Context<CloseVoteReceipt>, _name: String) -> Result<()> {
+        instructions::close_vote_receipt::process_close_vote_receipt(ctx)
+    }
 
     pub fn enable_claim_back_offer(ctx:Context<EnableClaimBackOffer>,_name:String)->Result<()>{
         instructions::enable_claim_back_offer::process_enable_claim_back_offer(ctx)
     }
+
     pub fn update_config(ctx:Context<UpdateConfig>,price_per_token:Option<u64>,tokens_per_vote:Option<u64>)->Result<()>{
         instructions::update_config::process_update_config(ctx,price_per_token,tokens_per_vote)
     }
+    
     pub fn get_admin_access_for_testing(ctx:Context<GetAdminAccessForTesting>)->Result<()>{
         instructions::get_admin_access_for_testing::process_get_admin_access_for_testing(ctx)
     }

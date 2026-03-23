@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{HxuiConfig, VoteReceipt,CustomError};
+use crate::{ANCHOR_DISCRIMINATOR, CustomError, HxuiConfig, VoteReceipt};
 
 #[derive(Accounts)]
 pub struct UpdateConfig<'info> {
@@ -21,7 +21,7 @@ pub fn process_update_config(ctx: Context<UpdateConfig> ,price_per_token: Option
 
     if let Some(price_per_token) = price_per_token {
         let rent = Rent::get()?;
-         require!(hxui_config.tokens_per_vote * hxui_config.price_per_token >= rent.minimum_balance(VoteReceipt::INIT_SPACE) ,CustomError::InvalidTokenPrice);
+         require!(hxui_config.tokens_per_vote * hxui_config.price_per_token >= rent.minimum_balance(VoteReceipt::INIT_SPACE + ANCHOR_DISCRIMINATOR) ,CustomError::InvalidTokenPrice);
         hxui_config.price_per_token = price_per_token;
     }
 
