@@ -12,7 +12,7 @@ HxUI is a crowdfunding and governance protocol built on Solana, designed to turn
 
 At its core, HxUI enables communities to directly fund and prioritize what gets built.
 
-HxUI currently powers **100xUI (www.100xUI.com →)**, our premium shadcn-based component registry. Through this, users can influence the development roadmap in a completely permissionless way:
+HxUI currently powers **[100xUI](https://www.100xui.com/)**, our premium shadcn-based component registry. Through this, users can influence the development roadmap in a completely permissionless way:
 
 Users can purchase HXUI tokens or earn HXUI Lite tokens by adding 100xUI components via the shadcn CLI to their projects  
 These tokens are used to vote on candidate components  
@@ -27,9 +27,27 @@ Because this runs on Solana, transactions are fast and cheap, making it easy for
 
 HxUI aims to become the Gumroad for UI, where creators do not have to guess what will sell. Demand is visible upfront, and the community funds what it wants to see built.
 
+## Quick Links
+
+- **HxUI Program (Devnet Deployment)**  
+  **[Solana explorer](https://explorer.solana.com/address/HLSeyqzgTyQZpUDqYZpo1sH1uJkE16gGRmRpvUmJRW7r?cluster=devnet)**
+
+- **100xUI (Live Implementation)**  
+  **[100xUI](https://www.100xui.com)** is a premium shadcn-based component registry.  
+  HxUI Protocol for 100xUI is implemented at **[100xUI Vote component](https://www.100xui.com/vote-component)** (Devnet) to monetize the registry.
+
+- **HxUI LiteSVM Test Sandbox (Replit)**  
+  **[55 tests passed](https://replit.com/@yashwant2311046/hxui-tests)**. Run tests directly using the **Run** button after remixing the project.
+
+<!-- - **Solana Playground (Isolated Test Case)**
+  Vote receipt cleanup by candidate ID (isolated due to LiteSVM limitations). -->
+
+- **HxUI Protocol Source Code (20+ instructions)**  
+  **[Github](https://github.com/YashwantOstwal/hxui_program/)**
+
 ## Architecture Overview
 
-HxUI is built as a set of on-chain instructions that manage the full lifecycle of a component, from creation to selection and release.
+HxUI Protocol is built as a set of on-chain instructions that manage the full lifecycle of a component, from creation to selection and release.
 
 Below is a breakdown of the system through its core instructions.
 
@@ -244,3 +262,18 @@ This admin-only instruction is used to close a non-active candidate account, cle
 ### 20. `update_config`
 
 This admin-only instruction allows the admin to update program configuration parameters stored in the **HxUI Config** account, such as `pricePerToken` and `tokensPerVote` and to delegate a new admin.
+
+## Milestones
+
+- **Ship to Mainnet**  
+  Complete audits, optimizations, and deploy the HxUI Protocol to Solana mainnet.
+
+- **Help UI Creators Earn**  
+  Empower UI libraries and 100+ shadcn registries to monetize their work through the HxUI Protocol on Solana.
+
+- **Make Web3 Invisible for Users**  
+  Onboard traditional Web2 users seamlessly into the Web3 ecosystem by upgrading 100xUI to use Privy’s embedded wallets.  
+  _(100xUI already uses Privy for external wallet connections.)_
+
+- **Grow the Ecosystem**  
+  Expand adoption through developer communities and social channels.
