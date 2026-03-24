@@ -6,16 +6,17 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-hxui = "FrcnG1KDPhPqcVaAeLu6DiB5FvZBvvqqxNn5KR8wMBct"
+hxui = "HLSeyqzgTyQZpUDqYZpo1sH1uJkE16gGRmRpvUmJRW7r"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "Localnet"
+cluster = "Devnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 \"tests/*.test.ts\""
+lite-test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 \"tests/litesvm.test.ts\""
 
 

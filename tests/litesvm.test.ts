@@ -1,6 +1,4 @@
-// ============================================================================
 // IMPORTS & SETUP
-// ============================================================================
 import anchor from "@coral-xyz/anchor";
 import {
   TOKEN_2022_PROGRAM_ID,
@@ -28,9 +26,7 @@ import {
 } from "litesvm";
 import IDL from "../target/idl/hxui.json" with { type: "json" };
 
-// ============================================================================
 // CONSTANTS & GLOBALS
-// ============================================================================
 const svm = new LiteSVM();
 const programId = new PublicKey(IDL.address);
 const coder = new anchor.BorshCoder(IDL as anchor.Idl);
@@ -85,9 +81,7 @@ const newCandidates: {
 };
 const activeCandidates: HxuiCandidate[] = [];
 
-// ============================================================================
 // PDA & SEED HELPERS
-// ============================================================================
 const PDAs: Record<string, { address: PublicKey; bump: number }> = {};
 const SEEDS: Record<string, string> = {
   hxuiVault: "hxui_vault",
@@ -151,9 +145,7 @@ function getHxuiLiteTokenAddress(owner: PublicKey) {
   );
 }
 
-// ============================================================================
 // ACCOUNT FETCHING HELPERS
-// ============================================================================
 function getConfigAccountData() {
   const accountInfo = svm.getAccount(getPda(SEEDS.hxuiConfig).address);
   return coder.accounts.decode("HxuiConfig", Buffer.from(accountInfo.data));
@@ -238,9 +230,7 @@ function getHxuiLiteTokenAccountData(owner: PublicKey) {
   );
 }
 
-// ============================================================================
 // TRANSACTION & ASSERTION HELPERS
-// ============================================================================
 function sendTransaction(
   ixs: TransactionInstruction[],
   signers: Keypair[] = [],
@@ -336,9 +326,7 @@ function checkNonActiveCandidateWith(
   }
 }
 
-// ============================================================================
 // INSTRUCTION (IXN) HELPERS
-// ============================================================================
 function getInitDuiInstruction() {
   const data = coder.instruction.encode("init_dui", {
     price_per_token,
@@ -948,9 +936,7 @@ function getWithdrawVaultFundsInstruction(
   });
 }
 
-// ============================================================================
 // TESTS SUITES
-// ============================================================================
 
 describe("1) init_dui instruction testing", () => {
   it("1.1) Should successfully initialize the global config account and vault with rent", () => {
