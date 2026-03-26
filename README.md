@@ -8,20 +8,20 @@ Even within ecosystems like shadcn, where 100+ community registries exist, creat
 
 ### The Solution: HxUI Protocol
 
-HxUI is a crowdfunding and governance protocol built on Solana, designed to turn open-source UI development into an incentive-aligned economy.
+HxUI Protocol is a crowdfunding and governance protocol built on Solana, designed to turn open-source UI development into an incentive-aligned economy.
 
-At its core, HxUI enables communities to directly fund and prioritize what gets built.
+At its core, HxUI Protocol enables communities to directly fund and prioritize what gets built.
 
-HxUI currently powers **[100xUI](https://www.100xui.com/)**, our premium shadcn-based component registry. Through this, users can influence the development roadmap in a completely permissionless way:
+HxUI Protocol currently powers **[100xUI](https://www.100xui.com/)**, our premium shadcn-based component registry. Through this, users can influence the development roadmap in a completely permissionless way:
 
-Users can purchase HXUI tokens or earn HXUI Lite tokens by adding 100xUI components via the shadcn CLI to their projects  
+Users can purchase HxUI tokens or earn HxUI Lite tokens by adding 100xUI components via the shadcn CLI to their projects  
 These tokens are used to vote on candidate components  
 Multiple components compete for attention in an open market of demand
 
 A component is only released if:
 
-It secures the highest votes in the current cycle among competing candidates, with others rolling over to the next cycle  
-It surpasses a minimum vote threshold, ensuring fair developer compensation
+It secures the highest votes in the current cycle among competing candidates, with others rolling over to the next cycle. 
+It surpasses a minimum vote threshold, ensuring fair developer compensation.
 
 Because this runs on Solana, transactions are fast and cheap, making it easy for users to participate without friction.
 
@@ -58,19 +58,19 @@ This instruction is invoked by the admin and acts as the bootstrapping step for 
 It sets up the following accounts:
 
 **HxUI Config**  
-Stores global program parameters such as the delegated `admin`, `tokens_per_vote`, and `price_per_token`.
+Stores global program parameters such as the delegated `admin`, `tokens_per_vote`, and `price_per_token`, etc.
 
 **HxUI Drop Time**  
-Defines the timestamp for the end of a voting cycle, after which a winner can be selected. It acts as a milestone to ensure users have sufficient time to participate before a component is chosen.
+Defines a future drop time (e.g., in days or weeks), after which a winner can be drawn from the active candidate components. It acts as a milestone to ensure users have sufficient time to participate before a component is chosen.
 
 **HxUI Free Mint Counter**  
-Tracks and enforces rate limits for free HxUI Lite token minting.
+Tracks and enforces global rate limits for free HxUI Lite token minting.
 
 **HxUI Mint**  
-Initializes the primary Token-2022 mint used for paid HxUI tokens, which users purchase to vote on active candidates.
+Initializes a HxUI Token-2022 mint used for paid HxUI tokens, which users purchase to vote on active candidate components.
 
 **HxUI Lite Mint**  
-Initializes the secondary Token-2022 mint used for free HxUI Lite tokens, distributed to users adding components via the shadcn CLI. Minting is rate-limited.
+Initializes the HxUI Lite Token-2022 mint used for free HxUI Lite tokens, distributed to users adding components via the shadcn CLI. Minting is rate-limited.
 
 **HxUI Vault**  
 A PDA that stores proceeds from HxUI token sales, which can later be withdrawn by the admin.
@@ -96,7 +96,7 @@ No winner can be selected before the drop time. Once a winner has been drawn, th
 This instruction initializes a new candidate account containing the metadata of a proposed UI component. Once created, users can vote for this candidate using HxUI or HxUI Lite tokens, until its status is active.
 
 **Candidate Account:**  
-Stores all data related to the proposed component, including `vote_count`, `claim_window` (if opened due to withdrawal of a component), and its current `status`.
+Stores all data related to the proposed component, including `name`, `description`, `vote_count`, its current `status`, etc.
 
 A candidate can have one of these 3 statuses:
 
@@ -140,12 +140,12 @@ This account stores the `next_mint_timestamp` and an `unregistered` boolean to m
 
 ### 7. `mint_free_tokens`
 
-This instruction is invoked when a user adds a 100xUI component to their project using the shadcn CLI. It mints `free_tokens_per_mint` HxUI Lite tokens, as defined in the HxUI Config, to the user’s associated HxUI Lite token account (ATA). These tokens can then be used to vote on candidate components.
+This instruction is invoked when a user adds a [100xUI](https://www.100xui.com) component to their project using the shadcn CLI. It mints `free_tokens_per_mint` HxUI Lite tokens, as defined in the HxUI Config, to the user’s associated HxUI Lite token account (ATA). These tokens can then be used to vote on active candidate components.
 
 Minting is permitted only if the following conditions are met:
 
-- The user has an active registration account (created during registration for free minting via [100xUI ](https://www.100xui.com) ).
-- The user has an associated HxUI Lite token account (ATA), which must be created during registration.
+- The user has an active Free Mint Tracker account (created during registration for free minting via [100xUI](https://www.100xui.com) ).
+- The user has an associated HxUI Lite token account (ATA), which can be created during registration.
 - The user has not exceeded the personal rate limit defined by their Free Mint Tracker account.
 - The global minting limit has not been reached, as defined in the HxUI Config `free_mints_per_epoch`.
 
@@ -153,7 +153,7 @@ Minting is permitted only if the following conditions are met:
 
 ### 8. `vote_with_hxui_lite`
 
-This instruction allows users to vote for a candidate using HxUI Lite tokens.
+This instruction allows users to vote for an active candidate component using HxUI Lite tokens.
 
 Unlike HxUI token voting, no vote receipt accounts are created when voting with HxUI Lite tokens.
 
@@ -192,9 +192,9 @@ The balance can only be claimed after the user has deregistered and once the coo
 
 ### 12. `draw_winner`
 
-This instruction selects a winner based on the highest number of votes among active candidates that meet the minimum vote requirement.
+This instruction selects a winner based on the highest number of votes among active candidate components that meet the minimum vote requirement defined in the HxUI Config `min_votes_to_be_winner.
 
-It can be invoked by users if not executed by the admin, but only after the `drop_timestamp` defined in the HxUI DropTime account has passed.
+It can be invoked by users if the admin, but only after the `drop_timestamp` defined in the HxUI DropTime account has passed.
 
 Once a candidate is selected as the winner, the corresponding component is expected to be dropped by the admin.
 
@@ -204,7 +204,7 @@ Once a candidate is selected as the winner, the corresponding component is expec
 
 This instruction allows the admin to remove an active candidate component. This action is expected to be used sparingly and only in exceptional cases, such as insufficient user traction or technical limitations in building the component.
 
-If users have spent paid HxUI tokens voting for the withdrawn candidate, the admin must open a **claim-back window** using `open_claim_back_window` for a considerable duration. During this period, users can reclaim their HxUI tokens using the `claim_back_tokens` instruction.
+If users have spent paid HxUI tokens voting for the withdrawn candidate, the admin must open a **claim-back window** using `open_claim_back_window` instruction for a considerable duration. During this period, users can reclaim their HxUI tokens using the `claim_back_tokens` instruction.
 
 After the claim-back window has closed, users can no longer reclaim their tokens. The admin may then clean up any remaining (unclaimed) vote receipt accounts, transferring their rent-exempt balances back to the vault.
 
