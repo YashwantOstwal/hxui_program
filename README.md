@@ -73,7 +73,7 @@ Initializes a HxUI Token-2022 mint used for paid HxUI tokens, which users purcha
 Initializes the HxUI Lite Token-2022 mint used for free HxUI Lite tokens, distributed to users adding components via the shadcn CLI. Minting is rate-limited.
 
 **HxUI Vault**  
-A PDA that stores proceeds from HxUI token sales, which can later be withdrawn by the admin.
+An account that stores proceeds from HxUI token sales, which can later be withdrawn by the admin.
 
 ## ![init_dui flow](./public/init_dui.png)
 
