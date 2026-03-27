@@ -12,7 +12,7 @@ hxui = "HLSeyqzgTyQZpUDqYZpo1sH1uJkE16gGRmRpvUmJRW7r"
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "Devnet"
+cluster = "Localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]

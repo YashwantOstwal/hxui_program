@@ -37,10 +37,7 @@ HxUI aims to become the Gumroad for UI, where creators do not have to guess what
   HxUI Protocol for 100xUI is implemented at **[100xUI Vote component](https://www.100xui.com/vote-component)** (Devnet) to monetize the registry.
 
 - **HxUI LiteSVM Test Sandbox (Replit)**  
-  **[55 tests passed](https://replit.com/@yashwant2311046/hxui-tests)**. Run tests directly using the **Run** button after remixing the project.
-
-<!-- - **Solana Playground (Isolated Test Case)**
-  Vote receipt cleanup by candidate ID (isolated due to LiteSVM limitations). -->
+  **[55 tests passed](https://replit.com/@yashwant2311046/hxui-tests)**. Run the tests using the **Run** button after remixing the project, and verify the results in the console.
 
 - **HxUI Protocol Source Code (20+ instructions)**  
   **[Github](https://github.com/YashwantOstwal/hxui_program/)**
@@ -212,6 +209,17 @@ After the claim-back window has closed, users can no longer reclaim their tokens
 
 ### 14. `open_claim_back_window`
 
+This admin-only instruction opens a claim-back window for a candidate with status **Withdrawn**, or **Winner** with a claim-back offer enabled, until a specified timestamp.
+
+During this window, users can reclaim their spent **HxUI tokens** on the specific candidate using the `claim_back_tokens` instruction:
+
+- **Withdrawn candidate:** Users can reclaim 100% of the HxUI tokens they spent.
+- **Winner with claim-back offer:** Users can reclaim 50% of the HxUI tokens they spent.
+
+Tokens can only be claimed during the claim-back window
+
+## ![open_claim_back_window flow](./public/open_claim_back_window.png)
+
 ### 15. `claim_back_tokens`
 
 This instruction allows users to reclaim 100% of the HxUI tokens they spent on a candidate if that candidate is withdrawn. Tokens can only be claimed during the claim-back window opened by the admin. Invoking `claim_back_tokens` also closes the corresponding vote receipt account and returns the rent-exempt balance to the HxUI vault.
@@ -247,6 +255,8 @@ Closing a vote receipt account transfers its rent-exempt balance back to the HxU
 - Winner candidate: Immediately after a winner is selected.
 - Withdrawn candidate and winner with claim back offer enabled: Only after the claim-back window has been opened and subsequently closed.
 
+## ![close_vote_receipt flow](./public/close_vote_receipt.png)
+
 ### 18. `close_candidate`
 
 This admin-only instruction is used to close a non-active candidate account, clearing all associated state and history for that candidate and reclaiming the rent-exempt balance back into the HxUI vault.
@@ -257,11 +267,125 @@ This admin-only instruction is used to close a non-active candidate account, cle
 
 <!-- Why receipt count required to be 0-->
 
+## ![close_candidate flow](./public/close_candidate.png)
+
 ### 19. `withdraw_vault_funds`
+
+This admin-only instruction allows withdrawal of funds from the HxUI vault, which holds the proceeds from selling HxUI tokens.
+
+A portion of the vault balance is reserved to cover the rent-exempt requirements of all potential vote receipt accounts that could be created from the current circulating supply of HxUI tokens. The remaining (unreserved) balance can be withdrawn immediately.
+
+The reserved portion becomes withdrawable only after the candidate lifecycle is complete—i.e., when candidates become non-active and all corresponding vote receipt accounts have either been claimed back or cleared.
+
+## ![withdraw_vault_funds flow](./public/withdraw_vault_funds.png)
 
 ### 20. `update_config`
 
 This admin-only instruction allows the admin to update program configuration parameters stored in the **HxUI Config** account, such as `pricePerToken` and `tokensPerVote` and to delegate a new admin.
+
+## ![update_config flow](./public/update_config.png)
+
+## Design Decisions
+
+### Why does 100xui.com use Privy as the Solana wallet adapter?
+
+Using Privy allows seamless onboarding of traditional Web2 users through embedded wallets with familiar authentication flows, reducing the friction typically associated with wallet setup. This aligns with the long-term vision of **[100xUI](https://www.100xui.com/)**, enabling anyone to participate without prior blockchain experience.
+
+---
+
+### Why and How does the HxUI vault afford the rent-exempt balance for vote receipt accounts?
+
+This design avoids friction for users by eliminating the need to pay additional rent when voting for new candidates or managing receipt account cleanup themselves.
+
+The HxUI vault funds the rent-exempt balance required to create vote receipt accounts (one per user–candidate pair) for votes cast using paid **HxUI tokens**.
+
+This is possible because the system guarantees that the **cost incurred by a user per vote is always greater than the minimum rent-exempt balance required to create a vote receipt account**.
+
+As a result, a portion of the user’s spend is implicitly reserved by the vault to cover the rent for these accounts.
+
+The vault maintains a **reserved amount**, which is:
+
+> The total rent required to exempt all possible vote receipt accounts that can be created from the current circulating supply of HxUI tokens.
+
+- This reserved portion **cannot be withdrawn immediately**
+- The remaining balance is **freely withdrawable by the admin**
+
+The reserved amount becomes withdrawable only after:
+
+- Vote receipt accounts are closed via:
+  - `claim_back_tokens` (user-driven), or
+  - `close_vote_receipt` (admin cleanup)
+- The rent-exempt balance is returned back to the vault
+
+---
+
+### Example
+
+**Current configuration:**
+
+- `price_per_token = 0.001 SOL`
+- `tokens_per_vote = 2`
+- Cost per vote = `0.001 × 2 = 0.002 SOL`
+
+- Minimum rent-exempt balance of vote receipt account (space = 21) = `0.00103704 SOL`
+
+✅ **Invariant holds:**  
+Cost per vote ≥ rent-exempt requirement
+
+---
+
+### Scenario
+
+Let’s say Alice buys **10 HxUI tokens** for `0.01 SOL`.
+
+- Maximum votes possible = `10 / 2 = 5`
+- Maximum vote receipt accounts = **5**
+
+**Vault state:**
+
+- Proceeds from HxUI token sales = `0.01 SOL`
+- Reserved = `0.0051852 SOL`
+- Withdrawable = `0.0048148 SOL`
+
+Now, if Alice casts 5 votes across 5 different candidates:
+
+- 5 vote receipt accounts are created
+- Rent is paid from the vault (already reserved)
+
+Once the candidate lifecycle completes (Winner / Withdrawn):
+
+- Vote receipt accounts are closed via:
+  - `claim_back_tokens` (user-driven), or
+  - `close_vote_receipt` (admin cleanup)
+- The rent-exempt balance is returned back to the vault
+
+- The rent-exempt balance is returned to the vault
+- The reserved amount becomes withdrawable
+
+---
+
+### Why are there separate mints for HxUI and HxUI Lite tokens?
+
+The separation of mints is done to clearly distinguish between **paid participation** and **free participation** in the voting system.
+
+Let’s assume a single unified mint, called a **Hybrid HxUI Mint**:
+
+- Alice buys **1 token** (paid)
+- Alice mints **1 token for free**
+- Total balance = **2 tokens (indistinguishable in origin)**
+
+Now, if Alice casts a vote:
+
+- A **vote receipt account** must be created to track spending and enable refunds, without being able to distinguish whether the tokens were bought or minted for free (e.g., if the candidate is withdrawn)
+- However, the **cost incurred by Alice may be less than the rent-exempt balance required** for the receipt account
+
+This breaks a core invariant of the system:
+
+> **Cost per vote ≥ rent-exempt balance requirement**
+
+Because free tokens introduce value without economic backing, the protocol cannot reliably fund the rent for receipt accounts.
+
+This is why **HxUI Lite votes are non-refundable**, as no receipt account is created to track their usage.
 
 ## Milestones
 
